@@ -19,7 +19,7 @@ package main
 // development. Do not use in production!
 
 import (
-	"github.com/guacsec/guac/cmd/graphql_playground/cmd"
+	"github.com/guacsec/guac/cmd/guac/cmd"
 )
 
 func main() {
