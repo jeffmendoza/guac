@@ -16,14 +16,14 @@ services:
   #   restart: on-failure
 
   nats:
-    image: "nats:2.9.14"
+    image: "docker.io/library/nats:2.9.14"
     command: "--config /config/nats/js.conf -m 8222"
     ports:
       - "4222:4222"
       # monitoring port
       - "8222:8222"
     volumes:
-      - ./container_files/nats:/config/nats
+      - ./container_files/nats:/config/nats:Z
     restart: on-failure
 
   # Due to the following issues, we have another container to perform the healthcheck
@@ -60,7 +60,7 @@ services:
       service-health-1:
         condition: service_completed_successfully
     volumes:
-      - ./container_files/guac:/guac
+      - ./container_files/guac:/guac:z
 
   guac-graphql:
     image: "local-organic-guac"
@@ -73,7 +73,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./container_files/guac:/guac
+      - ./container_files/guac:/guac:z
 
   # GUAC ingestor and oci collector are dependent on the collectsub service to be up
   service-health-2:
@@ -104,7 +104,7 @@ services:
       service-health-2:
         condition: service_completed_successfully
     volumes:
-      - ./container_files/guac:/guac
+      - ./container_files/guac:/guac:z
 
 
   oci-collector:
@@ -116,7 +116,7 @@ services:
       service-health-2:
         condition: service_completed_successfully
     volumes:
-      - ./container_files/guac:/guac
+      - ./container_files/guac:/guac:z
   depsdev-collector:
     image: "local-organic-guac"
     command: "/opt/guac/collector deps_dev --use-csub"
@@ -138,4 +138,4 @@ services:
       service-health-2:
         condition: service_completed_successfully
     volumes:
-      - ./container_files/guac:/guac
+      - ./container_files/guac:/guac:z
