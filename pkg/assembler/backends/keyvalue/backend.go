@@ -29,7 +29,7 @@ import (
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
 	"github.com/guacsec/guac/pkg/assembler/kv"
-	"github.com/guacsec/guac/pkg/assembler/kv/redis"
+	"github.com/guacsec/guac/pkg/assembler/kv/tikv"
 )
 
 func init() {
@@ -116,10 +116,15 @@ type demoClient struct {
 	vulnerabilityMetadatas vulnerabilityMetadataList
 }
 
-func getBackend(_ context.Context, _ backends.BackendArgs) (backends.Backend, error) {
+func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, error) {
+	kv, err := tikv.GetStore(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return &demoClient{
-		kv: &redis.Store{},
+		//kv: &redis.Store{},
 		//kv:              &memmap.Store{},
+		kv:              kv,
 		artifacts:       artMap{},
 		builders:        builderMap{},
 		index:           indexType{},
