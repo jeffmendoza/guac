@@ -29,7 +29,7 @@ import (
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
 	"github.com/guacsec/guac/pkg/assembler/kv"
-	"github.com/guacsec/guac/pkg/assembler/kv/tikv"
+	"github.com/guacsec/guac/pkg/assembler/kv/bbolt"
 )
 
 func init() {
@@ -117,7 +117,8 @@ type demoClient struct {
 }
 
 func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, error) {
-	kv, err := tikv.GetStore(ctx)
+	//kv, err := tikv.GetStore(ctx)
+	kv, err := bbolt.GetStore()
 	if err != nil {
 		return nil, err
 	}
