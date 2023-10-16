@@ -27,17 +27,13 @@ type Store struct {
 	m map[string]map[string]string
 }
 
-// check interface compatability
-var _ kv.Store = &Store{}
-
-func (s *Store) init() {
-	if s.m == nil {
-		s.m = make(map[string]map[string]string)
+func GetStore() kv.Store {
+	return &Store{
+		m: make(map[string]map[string]string),
 	}
 }
 
 func (s *Store) Get(_ context.Context, c, k string) (string, error) {
-	s.init()
 	col, ok := s.m[c]
 	if !ok {
 		return "", fmt.Errorf("%w : %s", kv.CollectionError, c)
@@ -51,7 +47,6 @@ func (s *Store) Get(_ context.Context, c, k string) (string, error) {
 }
 
 func (s *Store) Set(_ context.Context, c, k, v string) error {
-	s.init()
 	if s.m[c] == nil {
 		s.m[c] = make(map[string]string)
 	}
@@ -60,9 +55,8 @@ func (s *Store) Set(_ context.Context, c, k, v string) error {
 }
 
 func (s *Store) Keys(_ context.Context, c string) ([]string, error) {
-	s.init()
 	if s.m[c] == nil {
-		return nil, nil
+		return nil, fmt.Errorf("%w : %s", kv.CollectionError, c)
 	}
 	return maps.Keys(s.m[c]), nil
 }

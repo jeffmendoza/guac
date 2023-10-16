@@ -39,7 +39,8 @@ type scorecardLink struct {
 	collector        string
 }
 
-func (n *scorecardLink) ID() string { return n.id }
+func (n *scorecardLink) ID() string  { return n.id }
+func (n *scorecardLink) Key() string { return n.id }
 
 func (n *scorecardLink) Neighbors(allowedEdges edgeMap) []string {
 	if allowedEdges[model.EdgeCertifyScorecardSource] {

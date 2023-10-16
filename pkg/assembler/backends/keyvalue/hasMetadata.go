@@ -39,7 +39,8 @@ type hasMetadataLink struct {
 	collector     string
 }
 
-func (n *hasMetadataLink) ID() string { return n.id }
+func (n *hasMetadataLink) ID() string  { return n.id }
+func (n *hasMetadataLink) Key() string { return n.id }
 
 func (n *hasMetadataLink) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 1)
@@ -110,22 +111,14 @@ func (c *demoClient) ingestHasMetadata(ctx context.Context, subject model.Packag
 	searchIDs := []string{}
 	if subject.Package != nil {
 		var err error
-		packageID, err = getPackageIDFromInput(c, *subject.Package, *pkgMatchType)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		foundPkgNameorVersionNode, err = byID[pkgNameOrVersion](packageID, c)
+		foundPkgNameorVersionNode, err = c.getPackageNameOrVerFromInput(ctx, *subject.Package, *pkgMatchType)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
 		searchIDs = append(searchIDs, foundPkgNameorVersionNode.getHasMetadataLinks()...)
 	} else if subject.Artifact != nil {
 		var err error
-		artifactID, err = c.artifactIDByInput(ctx, subject.Artifact)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		foundArtStrct, err = byID[*artStruct](artifactID, c)
+		foundArtStrct, err = c.artifactByInput(ctx, subject.Artifact)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
@@ -323,7 +316,7 @@ func (c *demoClient) buildHasMetadata(ctx context.Context, link *hasMetadataLink
 	var err error
 	if filter != nil && filter.Subject != nil {
 		if filter.Subject.Package != nil && link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, filter.Subject.Package)
+			p, err = c.buildPackageResponse(ctx, link.packageID, filter.Subject.Package)
 			if err != nil {
 				return nil, err
 			}
@@ -342,7 +335,7 @@ func (c *demoClient) buildHasMetadata(ctx context.Context, link *hasMetadataLink
 		}
 	} else {
 		if link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, nil)
+			p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 			if err != nil {
 				return nil, err
 			}

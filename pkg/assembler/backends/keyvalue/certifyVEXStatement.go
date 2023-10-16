@@ -40,7 +40,8 @@ type vexLink struct {
 	collector       string
 }
 
-func (n *vexLink) ID() string { return n.id }
+func (n *vexLink) ID() string  { return n.id }
+func (n *vexLink) Key() string { return n.id }
 
 func (n *vexLink) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 2)
@@ -97,28 +98,20 @@ func (c *demoClient) ingestVEXStatement(ctx context.Context, subject model.Packa
 	defer unlock(&c.m, readOnly)
 
 	var packageID string
-	var foundPkgVersionNode *pkgVersionNode
+	var foundPkgVersionNode *pkgVersion
 	var artifactID string
 	var foundArtStrct *artStruct
 	var subjectVexLinks []string
 	if subject.Package != nil {
 		var err error
-		packageID, err = getPackageIDFromInput(c, *subject.Package, model.MatchFlags{Pkg: model.PkgMatchTypeSpecificVersion})
+		foundPkgVersionNode, err = c.getPackageVerFromInput(ctx, *subject.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		foundPkgVersionNode, err = byID[*pkgVersionNode](packageID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		subjectVexLinks = foundPkgVersionNode.vexLinks
+		subjectVexLinks = foundPkgVersionNode.VexLinks
 	} else {
 		var err error
-		artifactID, err = c.artifactIDByInput(ctx, subject.Artifact)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		foundArtStrct, err = byID[*artStruct](artifactID, c)
+		foundArtStrct, err = c.artifactByInput(ctx, subject.Artifact)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
@@ -248,13 +241,13 @@ func (c *demoClient) CertifyVEXStatement(ctx context.Context, filter *model.Cert
 		}
 	}
 	if !foundOne && filter != nil && filter.Subject != nil && filter.Subject.Package != nil {
-		pkgs, err := c.findPackageVersion(filter.Subject.Package)
+		pkgs, err := c.findPackageVersion(ctx, filter.Subject.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		foundOne = len(pkgs) > 0
 		for _, pkg := range pkgs {
-			search = append(search, pkg.vexLinks...)
+			search = append(search, pkg.VexLinks...)
 		}
 	}
 	if !foundOne && filter != nil && filter.Vulnerability != nil {
@@ -336,7 +329,7 @@ func (c *demoClient) buildCertifyVEXStatement(ctx context.Context, link *vexLink
 	var err error
 	if filter != nil && filter.Subject != nil {
 		if filter.Subject.Package != nil && link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, filter.Subject.Package)
+			p, err = c.buildPackageResponse(ctx, link.packageID, filter.Subject.Package)
 			if err != nil {
 				return nil, err
 			}
@@ -349,7 +342,7 @@ func (c *demoClient) buildCertifyVEXStatement(ctx context.Context, link *vexLink
 		}
 	} else {
 		if link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, nil)
+			p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 			if err != nil {
 				return nil, err
 			}

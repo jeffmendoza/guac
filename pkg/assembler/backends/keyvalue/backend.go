@@ -29,7 +29,7 @@ import (
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
 	"github.com/guacsec/guac/pkg/assembler/kv"
-	"github.com/guacsec/guac/pkg/assembler/kv/bbolt"
+	"github.com/guacsec/guac/pkg/assembler/kv/memmap"
 )
 
 func init() {
@@ -62,6 +62,8 @@ type node interface {
 
 	// BuildModelNode builds a GraphQL return type for a backend node,
 	BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error)
+
+	Key() string
 }
 
 type indexType map[string]node
@@ -73,9 +75,14 @@ var errNotFound = errors.New("not found")
 var epsilon = math.Nextafter(100, 100.1) - 100
 
 const (
-	indexCol = "index"
-	artCol   = "artifacts"
-	occCol   = "isOccurrences"
+	// Collection names must not have ":" in them
+	indexCol   = "index"
+	artCol     = "artifacts"
+	occCol     = "isOccurrences"
+	pkgTypeCol = "pkgTypes"
+	pkgNSCol   = "pkgNamespaces"
+	pkgNameCol = "pkgNames"
+	pkgVerCol  = "pkgVersions"
 )
 
 // atomic add to ensure ID is not duplicated
@@ -85,15 +92,16 @@ func (c *demoClient) getNextID() string {
 }
 
 type demoClient struct {
-	id    uint32
-	m     sync.RWMutex
-	kv    kv.Store
+	id uint32
+	m  sync.RWMutex
+	kv kv.Store
+
+	// -- delete below here
+
 	index indexType
 
-	artifacts       artMap
 	builders        builderMap
 	licenses        licMap
-	packages        pkgTypeMap
 	sources         srcTypeMap
 	vulnerabilities vulnTypeMap
 
@@ -107,7 +115,6 @@ type demoClient struct {
 	hasSources             hasSrcList
 	hashEquals             hashEqualList
 	isDependencies         isDependencyList
-	occurrences            isOccurrenceList
 	pkgEquals              pkgEqualList
 	pointOfContacts        pointOfContactList
 	scorecards             scorecardList
@@ -118,19 +125,17 @@ type demoClient struct {
 
 func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, error) {
 	//kv, err := tikv.GetStore(ctx)
-	kv, err := bbolt.GetStore()
-	if err != nil {
-		return nil, err
-	}
+	// kv, err := memmap.GetStore()
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return &demoClient{
 		//kv: &redis.Store{},
-		//kv:              &memmap.Store{},
-		kv:              kv,
-		artifacts:       artMap{},
+		kv: memmap.GetStore(),
+		//kv:              kv,
 		builders:        builderMap{},
 		index:           indexType{},
 		licenses:        licMap{},
-		packages:        pkgTypeMap{},
 		sources:         srcTypeMap{},
 		vulnerabilities: vulnTypeMap{},
 	}, nil
@@ -199,18 +204,43 @@ func byID[E node](id string, c *demoClient) (E, error) {
 	return s, nil
 }
 
-func byIDkv[E node](ctx context.Context, id string, coll string, c *demoClient) (E, error) {
+func byIDkv[E node](ctx context.Context, id string, c *demoClient) (E, error) {
 	var nl E
 	k, err := c.kv.Get(ctx, indexCol, id)
 	if err != nil {
 		return nl, err
 	}
+	sub := strings.SplitN(k, ":", 2)
+	if len(sub) != 2 {
+		return nl, fmt.Errorf("Bad value was stored in index map: %v", k)
+	}
+	// FIXME make a table and check that collection(sub[0]) is correct for typeof E
+	return byKeykv[E](ctx, sub[1], sub[0], c)
+}
+
+func byKeykv[E node](ctx context.Context, k string, coll string, c *demoClient) (E, error) {
+	var nl E
 	strval, err := c.kv.Get(ctx, coll, k)
 	if err != nil {
 		return nl, err
 	}
-	err = json.Unmarshal(([]byte)(strval), &nl)
-	return nl, err
+	if err = json.Unmarshal([]byte(strval), &nl); err != nil {
+		return nl, err
+	}
+	return nl, nil
+}
+
+func setkv[E node](ctx context.Context, coll string, n E, c *demoClient) error {
+	byteval, err := json.Marshal(n)
+	if err != nil {
+		return err
+	}
+	return c.kv.Set(ctx, coll, n.Key(), string(byteval))
+}
+
+func (c *demoClient) addToIndex(ctx context.Context, coll string, n node) error {
+	val := strings.Join([]string{coll, n.Key()}, ":")
+	return c.kv.Set(ctx, indexCol, n.ID(), val)
 }
 
 func lock(m *sync.RWMutex, readOnly bool) {

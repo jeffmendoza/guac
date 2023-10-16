@@ -39,6 +39,10 @@ type badLink struct {
 	knownSince    time.Time
 }
 
+func (n *badLink) Key() string {
+	return ""
+}
+
 func (n *badLink) ID() string { return n.id }
 
 func (n *badLink) Neighbors(allowedEdges edgeMap) []string {
@@ -101,33 +105,24 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 
 	var packageID string
 	var foundPkgNameorVersionNode pkgNameOrVersion
-	var artifactID string
-	var foundArtStrct *artStruct
+	var foundArtStruct *artStruct
 	var sourceID string
 	var srcName *srcNameNode
 	var searchIDs []string
 	if subject.Package != nil {
 		var err error
-		packageID, err = getPackageIDFromInput(c, *subject.Package, *pkgMatchType)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		foundPkgNameorVersionNode, err = byID[pkgNameOrVersion](packageID, c)
+		foundPkgNameorVersionNode, err = c.getPackageNameOrVerFromInput(ctx, *subject.Package, *pkgMatchType)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
 		searchIDs = foundPkgNameorVersionNode.getCertifyBadLinks()
 	} else if subject.Artifact != nil {
 		var err error
-		artifactID, err = c.artifactIDByInput(ctx, subject.Artifact)
+		foundArtStruct, err = c.artifactByInput(ctx, subject.Artifact)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		foundArtStrct, err = byID[*artStruct](artifactID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		searchIDs = foundArtStrct.badLinks
+		searchIDs = foundArtStruct.badLinks
 	} else {
 		var err error
 		sourceID, err = getSourceIDFromInput(c, *subject.Source)
@@ -153,7 +148,7 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 		if packageID != "" && packageID == v.packageID {
 			subjectMatch = true
 		}
-		if artifactID != "" && artifactID == v.artifactID {
+		if foundArtStruct != nil && foundArtStruct.ThisID == v.artifactID {
 			subjectMatch = true
 		}
 		if sourceID != "" && sourceID == v.sourceID {
@@ -179,7 +174,7 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 		collectedCertifyBadLink = badLink{
 			id:            c.getNextID(),
 			packageID:     packageID,
-			artifactID:    artifactID,
+			artifactID:    foundArtStruct.ThisID,
 			sourceID:      sourceID,
 			justification: certifyBad.Justification,
 			origin:        certifyBad.Origin,
@@ -192,8 +187,8 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 		if packageID != "" {
 			foundPkgNameorVersionNode.setCertifyBadLinks(collectedCertifyBadLink.id)
 		}
-		if artifactID != "" {
-			foundArtStrct.setCertifyBadLinks(collectedCertifyBadLink.id)
+		if foundArtStruct != nil {
+			foundArtStruct.setCertifyBadLinks(collectedCertifyBadLink.id)
 		}
 		if sourceID != "" {
 			srcName.setCertifyBadLinks(collectedCertifyBadLink.id)
@@ -308,7 +303,7 @@ func (c *demoClient) buildCertifyBad(ctx context.Context, link *badLink, filter 
 	var err error
 	if filter != nil && filter.Subject != nil {
 		if filter.Subject.Package != nil && link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, filter.Subject.Package)
+			p, err = c.buildPackageResponse(ctx, link.packageID, filter.Subject.Package)
 			if err != nil {
 				return nil, err
 			}
@@ -327,7 +322,7 @@ func (c *demoClient) buildCertifyBad(ctx context.Context, link *badLink, filter 
 		}
 	} else {
 		if link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, nil)
+			p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 			if err != nil {
 				return nil, err
 			}

@@ -44,7 +44,8 @@ type (
 	}
 )
 
-func (n *hasSLSAStruct) ID() string { return n.id }
+func (n *hasSLSAStruct) ID() string  { return n.id }
+func (n *hasSLSAStruct) Key() string { return n.id }
 
 func (n *hasSLSAStruct) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 2+len(n.builtFrom))

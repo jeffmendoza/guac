@@ -38,7 +38,8 @@ type (
 	}
 )
 
-func (n *hashEqualStruct) ID() string { return n.id }
+func (n *hashEqualStruct) ID() string  { return n.id }
+func (n *hashEqualStruct) Key() string { return n.id }
 
 func (n *hashEqualStruct) Neighbors(allowedEdges edgeMap) []string {
 	if allowedEdges[model.EdgeHashEqualArtifact] {

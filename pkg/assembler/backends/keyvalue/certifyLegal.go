@@ -44,7 +44,8 @@ type (
 	}
 )
 
-func (n *certifyLegalStruct) ID() string { return n.id }
+func (n *certifyLegalStruct) ID() string  { return n.id }
+func (n *certifyLegalStruct) Key() string { return n.id }
 
 func (n *certifyLegalStruct) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 2)
@@ -62,7 +63,7 @@ func (n *certifyLegalStruct) Neighbors(allowedEdges edgeMap) []string {
 }
 
 func (n *certifyLegalStruct) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
-	return c.convLegal(n)
+	return c.convLegal(ctx, n)
 }
 
 func (c *demoClient) IngestCertifyLegals(ctx context.Context, subjects model.PackageOrSourceInputs, declaredLicensesList [][]*model.LicenseInputSpec, discoveredLicensesList [][]*model.LicenseInputSpec, certifyLegals []*model.CertifyLegalInputSpec) ([]*model.CertifyLegal, error) {
@@ -120,20 +121,14 @@ func (c *demoClient) ingestCertifyLegal(ctx context.Context, subject model.Packa
 
 	var backedgeSearch []string
 	var packageID string
-	var pkg *pkgVersionNode
+	var pkg *pkgVersion
 	if subject.Package != nil {
-		var pmt model.MatchFlags
-		pmt.Pkg = model.PkgMatchTypeSpecificVersion
-		pid, err := getPackageIDFromInput(c, *subject.Package, pmt)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
-		}
-		packageID = pid
-		pkg, err = byID[*pkgVersionNode](packageID, c)
+		var err error
+		pkg, err = c.getPackageVerFromInput(ctx, *subject.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		backedgeSearch = pkg.certifyLegals
+		backedgeSearch = pkg.CertifyLegals
 	}
 
 	var sourceID string
@@ -167,7 +162,7 @@ func (c *demoClient) ingestCertifyLegal(ctx context.Context, subject model.Packa
 			cl.justification == certifyLegal.Justification &&
 			cl.origin == certifyLegal.Origin &&
 			cl.collector == certifyLegal.Collector {
-			return c.convLegal(cl)
+			return c.convLegal(ctx, cl)
 		}
 	}
 	if readOnly {
@@ -212,10 +207,10 @@ func (c *demoClient) ingestCertifyLegal(ctx context.Context, subject model.Packa
 	}
 	c.certifyLegals = append(c.certifyLegals, cl)
 
-	return c.convLegal(cl)
+	return c.convLegal(ctx, cl)
 }
 
-func (c *demoClient) convLegal(in *certifyLegalStruct) (*model.CertifyLegal, error) {
+func (c *demoClient) convLegal(ctx context.Context, in *certifyLegalStruct) (*model.CertifyLegal, error) {
 	cl := &model.CertifyLegal{
 		ID:                in.id,
 		DeclaredLicense:   in.declaredLicense,
@@ -241,7 +236,7 @@ func (c *demoClient) convLegal(in *certifyLegalStruct) (*model.CertifyLegal, err
 		cl.DiscoveredLicenses = append(cl.DiscoveredLicenses, c.convLicense(l))
 	}
 	if in.pkg != "" {
-		p, err := c.buildPackageResponse(in.pkg, nil)
+		p, err := c.buildPackageResponse(ctx, in.pkg, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -269,7 +264,7 @@ func (c *demoClient) CertifyLegal(ctx context.Context, filter *model.CertifyLega
 			return nil, nil
 		}
 		// If found by id, ignore rest of fields in spec and return as a match
-		o, err := c.convLegal(link)
+		o, err := c.convLegal(ctx, link)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
@@ -279,13 +274,13 @@ func (c *demoClient) CertifyLegal(ctx context.Context, filter *model.CertifyLega
 	var search []string
 	foundOne := false
 	if filter != nil && filter.Subject != nil && filter.Subject.Package != nil {
-		pkgs, err := c.findPackageVersion(filter.Subject.Package)
+		pkgs, err := c.findPackageVersion(ctx, filter.Subject.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		foundOne = len(pkgs) > 0
 		for _, pkg := range pkgs {
-			search = append(search, pkg.certifyLegals...)
+			search = append(search, pkg.CertifyLegals...)
 		}
 	}
 	if !foundOne && filter != nil && filter.Subject != nil && filter.Subject.Source != nil {
@@ -332,7 +327,7 @@ func (c *demoClient) CertifyLegal(ctx context.Context, filter *model.CertifyLega
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
-			out, err = c.addLegalIfMatch(out, filter, link)
+			out, err = c.addLegalIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -340,7 +335,7 @@ func (c *demoClient) CertifyLegal(ctx context.Context, filter *model.CertifyLega
 	} else {
 		for _, link := range c.certifyLegals {
 			var err error
-			out, err = c.addLegalIfMatch(out, filter, link)
+			out, err = c.addLegalIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -349,7 +344,7 @@ func (c *demoClient) CertifyLegal(ctx context.Context, filter *model.CertifyLega
 	return out, nil
 }
 
-func (c *demoClient) addLegalIfMatch(out []*model.CertifyLegal,
+func (c *demoClient) addLegalIfMatch(ctx context.Context, out []*model.CertifyLegal,
 	filter *model.CertifyLegalSpec, link *certifyLegalStruct) (
 	[]*model.CertifyLegal, error,
 ) {
@@ -369,7 +364,7 @@ func (c *demoClient) addLegalIfMatch(out []*model.CertifyLegal,
 			if link.pkg == "" {
 				return out, nil
 			}
-			p, err := c.buildPackageResponse(link.pkg, filter.Subject.Package)
+			p, err := c.buildPackageResponse(ctx, link.pkg, filter.Subject.Package)
 			if err != nil {
 				return nil, err
 			}
@@ -389,7 +384,7 @@ func (c *demoClient) addLegalIfMatch(out []*model.CertifyLegal,
 			}
 		}
 	}
-	o, err := c.convLegal(link)
+	o, err := c.convLegal(ctx, link)
 	if err != nil {
 		return nil, err
 	}

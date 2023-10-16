@@ -37,6 +37,10 @@ type goodLink struct {
 	knownSince    time.Time
 }
 
+func (n *goodLink) Key() string {
+	return ""
+}
+
 func (n *goodLink) ID() string { return n.id }
 
 func (n *goodLink) Neighbors(allowedEdges edgeMap) []string {
@@ -107,22 +111,14 @@ func (c *demoClient) ingestCertifyGood(ctx context.Context, subject model.Packag
 	searchIDs := []string{}
 	if subject.Package != nil {
 		var err error
-		packageID, err = getPackageIDFromInput(c, *subject.Package, *pkgMatchType)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		foundPkgNameorVersionNode, err = byID[pkgNameOrVersion](packageID, c)
+		foundPkgNameorVersionNode, err = c.getPackageNameOrVerFromInput(ctx, *subject.Package, *pkgMatchType)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
 		searchIDs = append(searchIDs, foundPkgNameorVersionNode.getCertifyGoodLinks()...)
 	} else if subject.Artifact != nil {
 		var err error
-		artifactID, err = c.artifactIDByInput(ctx, subject.Artifact)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		foundArtStrct, err = byID[*artStruct](artifactID, c)
+		foundArtStrct, err = c.artifactByInput(ctx, subject.Artifact)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
@@ -308,7 +304,7 @@ func (c *demoClient) buildCertifyGood(ctx context.Context, link *goodLink, filte
 	var err error
 	if filter != nil && filter.Subject != nil {
 		if filter.Subject.Package != nil && link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, filter.Subject.Package)
+			p, err = c.buildPackageResponse(ctx, link.packageID, filter.Subject.Package)
 			if err != nil {
 				return nil, err
 			}
@@ -327,7 +323,7 @@ func (c *demoClient) buildCertifyGood(ctx context.Context, link *goodLink, filte
 		}
 	} else {
 		if link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, nil)
+			p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 			if err != nil {
 				return nil, err
 			}

@@ -34,7 +34,8 @@ type licStruct struct {
 	certifyLegals []string
 }
 
-func (n *licStruct) ID() string { return n.id }
+func (n *licStruct) ID() string  { return n.id }
+func (n *licStruct) Key() string { return n.id }
 
 func (n *licStruct) Neighbors(allowedEdges edgeMap) []string {
 	if allowedEdges[model.EdgeLicenseCertifyLegal] {

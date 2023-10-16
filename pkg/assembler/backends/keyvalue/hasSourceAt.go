@@ -36,7 +36,8 @@ type srcMapLink struct {
 	collector     string
 }
 
-func (n *srcMapLink) ID() string { return n.id }
+func (n *srcMapLink) ID() string  { return n.id }
+func (n *srcMapLink) Key() string { return n.id }
 
 func (n *srcMapLink) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 2)
@@ -50,7 +51,7 @@ func (n *srcMapLink) Neighbors(allowedEdges edgeMap) []string {
 }
 
 func (n *srcMapLink) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
-	return c.buildHasSourceAt(n, nil, true)
+	return c.buildHasSourceAt(ctx, n, nil, true)
 }
 
 // Ingest HasSourceAt
@@ -87,11 +88,7 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 	}
 	sourceHasSourceLinks := srcName.srcMapLinks
 
-	packageID, err := getPackageIDFromInput(c, packageArg, pkgMatchType)
-	if err != nil {
-		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-	}
-	pkgNameOrVersionNode, err := byID[pkgNameOrVersion](packageID, c)
+	pkgNameOrVersionNode, err := c.getPackageNameOrVerFromInput(ctx, packageArg, pkgMatchType)
 	if err != nil {
 		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 	}
@@ -112,7 +109,7 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		if packageID == v.packageID && sourceID == v.sourceID && hasSourceAt.Justification == v.justification &&
+		if pkgNameOrVersionNode.ID() == v.packageID && sourceID == v.sourceID && hasSourceAt.Justification == v.justification &&
 			hasSourceAt.Origin == v.origin && hasSourceAt.Collector == v.collector && hasSourceAt.KnownSince.Equal(v.knownSince) {
 			collectedSrcMapLink = *v
 			duplicate = true
@@ -130,7 +127,7 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 		collectedSrcMapLink = srcMapLink{
 			id:            c.getNextID(),
 			sourceID:      sourceID,
-			packageID:     packageID,
+			packageID:     pkgNameOrVersionNode.ID(),
 			knownSince:    hasSourceAt.KnownSince.UTC(),
 			justification: hasSourceAt.Justification,
 			origin:        hasSourceAt.Origin,
@@ -144,7 +141,7 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 	}
 
 	// build return GraphQL type
-	foundHasSourceAt, err := c.buildHasSourceAt(&collectedSrcMapLink, nil, true)
+	foundHasSourceAt, err := c.buildHasSourceAt(ctx, &collectedSrcMapLink, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +159,7 @@ func (c *demoClient) HasSourceAt(ctx context.Context, filter *model.HasSourceAtS
 			// Not found
 			return nil, nil
 		}
-		foundHasSourceAt, err := c.buildHasSourceAt(link, filter, true)
+		foundHasSourceAt, err := c.buildHasSourceAt(ctx, link, filter, true)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
@@ -191,7 +188,7 @@ func (c *demoClient) HasSourceAt(ctx context.Context, filter *model.HasSourceAtS
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
-			out, err = c.addSrcIfMatch(out, filter, link)
+			out, err = c.addSrcIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -199,7 +196,7 @@ func (c *demoClient) HasSourceAt(ctx context.Context, filter *model.HasSourceAtS
 	} else {
 		for _, link := range c.hasSources {
 			var err error
-			out, err = c.addSrcIfMatch(out, filter, link)
+			out, err = c.addSrcIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -209,12 +206,12 @@ func (c *demoClient) HasSourceAt(ctx context.Context, filter *model.HasSourceAtS
 	return out, nil
 }
 
-func (c *demoClient) buildHasSourceAt(link *srcMapLink, filter *model.HasSourceAtSpec, ingestOrIDProvided bool) (*model.HasSourceAt, error) {
+func (c *demoClient) buildHasSourceAt(ctx context.Context, link *srcMapLink, filter *model.HasSourceAtSpec, ingestOrIDProvided bool) (*model.HasSourceAt, error) {
 	var p *model.Package
 	var s *model.Source
 	var err error
 	if filter != nil {
-		p, err = c.buildPackageResponse(link.packageID, filter.Package)
+		p, err = c.buildPackageResponse(ctx, link.packageID, filter.Package)
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +220,7 @@ func (c *demoClient) buildHasSourceAt(link *srcMapLink, filter *model.HasSourceA
 			return nil, err
 		}
 	} else {
-		p, err = c.buildPackageResponse(link.packageID, nil)
+		p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +254,7 @@ func (c *demoClient) buildHasSourceAt(link *srcMapLink, filter *model.HasSourceA
 	return &newHSA, nil
 }
 
-func (c *demoClient) addSrcIfMatch(out []*model.HasSourceAt,
+func (c *demoClient) addSrcIfMatch(ctx context.Context, out []*model.HasSourceAt,
 	filter *model.HasSourceAtSpec, link *srcMapLink) (
 	[]*model.HasSourceAt, error) {
 	if filter != nil && noMatch(filter.Justification, link.justification) {
@@ -272,7 +269,7 @@ func (c *demoClient) addSrcIfMatch(out []*model.HasSourceAt,
 	if filter != nil && filter.KnownSince != nil && !filter.KnownSince.Equal(link.knownSince) {
 		return out, nil
 	}
-	foundHasSourceAt, err := c.buildHasSourceAt(link, filter, false)
+	foundHasSourceAt, err := c.buildHasSourceAt(ctx, link, filter, false)
 	if err != nil {
 		return nil, err
 	}

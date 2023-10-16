@@ -39,7 +39,8 @@ type hasSBOMStruct struct {
 	knownSince       time.Time
 }
 
-func (n *hasSBOMStruct) ID() string { return n.id }
+func (n *hasSBOMStruct) ID() string  { return n.id }
+func (n *hasSBOMStruct) Key() string { return n.id }
 
 func (n *hasSBOMStruct) Neighbors(allowedEdges edgeMap) []string {
 	if n.pkg != "" && allowedEdges[model.EdgeHasSbomPackage] {
@@ -52,7 +53,7 @@ func (n *hasSBOMStruct) Neighbors(allowedEdges edgeMap) []string {
 }
 
 func (n *hasSBOMStruct) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
-	return c.convHasSBOM(n)
+	return c.convHasSBOM(ctx, n)
 }
 
 // Ingest HasSBOM
@@ -92,21 +93,16 @@ func (c *demoClient) ingestHasSbom(ctx context.Context, subject model.PackageOrA
 
 	var search []string
 	var packageID string
-	var pkg *pkgVersionNode
+	var pkg *pkgVersion
 	var artID string
 	var art *artStruct
 	if subject.Package != nil {
-		pmt := model.MatchFlags{Pkg: model.PkgMatchTypeSpecificVersion}
 		var err error
-		packageID, err = getPackageIDFromInput(c, *subject.Package, pmt)
+		pkg, err = c.getPackageVerFromInput(ctx, *subject.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		pkg, err = byID[*pkgVersionNode](packageID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		search = pkg.hasSBOMs
+		search = pkg.HasSBOMs
 	} else {
 		var err error
 		art, err = c.artifactByInput(ctx, subject.Artifact)
@@ -134,7 +130,7 @@ func (c *demoClient) ingestHasSbom(ctx context.Context, subject model.PackageOrA
 			h.origin == input.Origin &&
 			h.collector == input.Collector &&
 			input.KnownSince.Equal(h.knownSince) {
-			return c.convHasSBOM(h)
+			return c.convHasSBOM(ctx, h)
 		}
 	}
 
@@ -164,10 +160,10 @@ func (c *demoClient) ingestHasSbom(ctx context.Context, subject model.PackageOrA
 	} else {
 		art.setHasSBOMs(h.id)
 	}
-	return c.convHasSBOM(h)
+	return c.convHasSBOM(ctx, h)
 }
 
-func (c *demoClient) convHasSBOM(in *hasSBOMStruct) (*model.HasSbom, error) {
+func (c *demoClient) convHasSBOM(ctx context.Context, in *hasSBOMStruct) (*model.HasSbom, error) {
 	out := &model.HasSbom{
 		ID:               in.id,
 		URI:              in.uri,
@@ -179,7 +175,7 @@ func (c *demoClient) convHasSBOM(in *hasSBOMStruct) (*model.HasSbom, error) {
 		KnownSince:       in.knownSince.UTC(),
 	}
 	if in.pkg != "" {
-		p, err := c.buildPackageResponse(in.pkg, nil)
+		p, err := c.buildPackageResponse(ctx, in.pkg, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +204,7 @@ func (c *demoClient) HasSBOM(ctx context.Context, filter *model.HasSBOMSpec) ([]
 			return nil, nil
 		}
 		// If found by id, ignore rest of fields in spec and return as a match
-		sb, err := c.convHasSBOM(link)
+		sb, err := c.convHasSBOM(ctx, link)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
@@ -218,13 +214,13 @@ func (c *demoClient) HasSBOM(ctx context.Context, filter *model.HasSBOMSpec) ([]
 	var search []string
 	foundOne := false
 	if filter != nil && filter.Subject != nil && filter.Subject.Package != nil {
-		pkgs, err := c.findPackageVersion(filter.Subject.Package)
+		pkgs, err := c.findPackageVersion(ctx, filter.Subject.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		foundOne = len(pkgs) > 0
 		for _, pkg := range pkgs {
-			search = append(search, pkg.hasSBOMs...)
+			search = append(search, pkg.HasSBOMs...)
 		}
 	}
 	if !foundOne && filter != nil && filter.Subject != nil && filter.Subject.Artifact != nil {
@@ -282,7 +278,7 @@ func (c *demoClient) addHasSBOMIfMatch(ctx context.Context, out []*model.HasSbom
 				if link.pkg == "" {
 					return out, nil
 				}
-				p, err := c.buildPackageResponse(link.pkg, filter.Subject.Package)
+				p, err := c.buildPackageResponse(ctx, link.pkg, filter.Subject.Package)
 				if err != nil {
 					return nil, err
 				}
@@ -299,7 +295,7 @@ func (c *demoClient) addHasSBOMIfMatch(ctx context.Context, out []*model.HasSbom
 			}
 		}
 	}
-	sb, err := c.convHasSBOM(link)
+	sb, err := c.convHasSBOM(ctx, link)
 	if err != nil {
 		return nil, err
 	}

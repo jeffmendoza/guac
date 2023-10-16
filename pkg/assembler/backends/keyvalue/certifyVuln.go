@@ -41,7 +41,8 @@ type certifyVulnerabilityLink struct {
 	collector       string
 }
 
-func (n *certifyVulnerabilityLink) ID() string { return n.id }
+func (n *certifyVulnerabilityLink) ID() string  { return n.id }
+func (n *certifyVulnerabilityLink) Key() string { return n.id }
 
 func (n *certifyVulnerabilityLink) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 2)
@@ -55,7 +56,7 @@ func (n *certifyVulnerabilityLink) Neighbors(allowedEdges edgeMap) []string {
 }
 
 func (n *certifyVulnerabilityLink) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
-	return c.buildCertifyVulnerability(n, nil, true)
+	return c.buildCertifyVulnerability(ctx, n, nil, true)
 }
 
 // Ingest CertifyVuln
@@ -80,15 +81,11 @@ func (c *demoClient) ingestVulnerability(ctx context.Context, packageArg model.P
 	lock(&c.m, readOnly)
 	defer unlock(&c.m, readOnly)
 
-	packageID, err := getPackageIDFromInput(c, packageArg, model.MatchFlags{Pkg: model.PkgMatchTypeSpecificVersion})
+	foundPackage, err := c.getPackageVerFromInput(ctx, packageArg)
 	if err != nil {
 		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 	}
-	foundPackage, err := byID[*pkgVersionNode](packageID, c)
-	if err != nil {
-		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-	}
-	packageVulns := foundPackage.certifyVulnLinks
+	packageVulns := foundPackage.CertifyVulnLinks
 
 	var vulnerabilityLinks []string
 
@@ -121,7 +118,7 @@ func (c *demoClient) ingestVulnerability(ctx context.Context, packageArg model.P
 		if vulnID != "" && vulnID == v.vulnerabilityID {
 			vulnMatch = true
 		}
-		if vulnMatch && packageID == v.packageID && certifyVuln.TimeScanned.Equal(v.timeScanned) && certifyVuln.DbURI == v.dbURI &&
+		if vulnMatch && foundPackage.ThisID == v.packageID && certifyVuln.TimeScanned.Equal(v.timeScanned) && certifyVuln.DbURI == v.dbURI &&
 			certifyVuln.DbVersion == v.dbVersion && certifyVuln.ScannerURI == v.scannerURI && certifyVuln.ScannerVersion == v.scannerVersion &&
 			certifyVuln.Origin == v.origin && certifyVuln.Collector == v.collector {
 
@@ -141,7 +138,7 @@ func (c *demoClient) ingestVulnerability(ctx context.Context, packageArg model.P
 		// store the link
 		collectedCertifyVulnLink = certifyVulnerabilityLink{
 			id:              c.getNextID(),
-			packageID:       packageID,
+			packageID:       foundPackage.ThisID,
 			vulnerabilityID: vulnID,
 			timeScanned:     certifyVuln.TimeScanned,
 			dbURI:           certifyVuln.DbURI,
@@ -161,7 +158,7 @@ func (c *demoClient) ingestVulnerability(ctx context.Context, packageArg model.P
 	}
 
 	// build return GraphQL type
-	builtCertifyVuln, err := c.buildCertifyVulnerability(&collectedCertifyVulnLink, nil, true)
+	builtCertifyVuln, err := c.buildCertifyVulnerability(ctx, &collectedCertifyVulnLink, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +178,7 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 			return nil, nil
 		}
 		// If found by id, ignore rest of fields in spec and return as a match
-		foundCertifyVuln, err := c.buildCertifyVulnerability(link, filter, true)
+		foundCertifyVuln, err := c.buildCertifyVulnerability(ctx, link, filter, true)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
@@ -191,13 +188,13 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 	var search []string
 	foundOne := false
 	if filter != nil && filter.Package != nil {
-		pkgs, err := c.findPackageVersion(filter.Package)
+		pkgs, err := c.findPackageVersion(ctx, filter.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		foundOne = len(pkgs) > 0
 		for _, pkg := range pkgs {
-			search = append(search, pkg.certifyVulnLinks...)
+			search = append(search, pkg.CertifyVulnLinks...)
 		}
 	}
 	if !foundOne && filter != nil && filter.Vulnerability != nil &&
@@ -239,7 +236,7 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
-			out, err = c.addCVIfMatch(out, filter, link)
+			out, err = c.addCVIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -247,7 +244,7 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 	} else {
 		for _, link := range c.certifyVulnerabilities {
 			var err error
-			out, err = c.addCVIfMatch(out, filter, link)
+			out, err = c.addCVIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -257,7 +254,7 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 	return out, nil
 }
 
-func (c *demoClient) addCVIfMatch(out []*model.CertifyVuln,
+func (c *demoClient) addCVIfMatch(ctx context.Context, out []*model.CertifyVuln,
 	filter *model.CertifyVulnSpec,
 	link *certifyVulnerabilityLink) ([]*model.CertifyVuln, error) {
 	if filter != nil && filter.TimeScanned != nil && !filter.TimeScanned.Equal(link.timeScanned) {
@@ -282,7 +279,7 @@ func (c *demoClient) addCVIfMatch(out []*model.CertifyVuln,
 		return out, nil
 	}
 
-	foundCertifyVuln, err := c.buildCertifyVulnerability(link, filter, false)
+	foundCertifyVuln, err := c.buildCertifyVulnerability(ctx, link, filter, false)
 	if err != nil {
 		return nil, err
 	}
@@ -292,17 +289,17 @@ func (c *demoClient) addCVIfMatch(out []*model.CertifyVuln,
 	return append(out, foundCertifyVuln), nil
 }
 
-func (c *demoClient) buildCertifyVulnerability(link *certifyVulnerabilityLink, filter *model.CertifyVulnSpec, ingestOrIDProvided bool) (*model.CertifyVuln, error) {
+func (c *demoClient) buildCertifyVulnerability(ctx context.Context, link *certifyVulnerabilityLink, filter *model.CertifyVulnSpec, ingestOrIDProvided bool) (*model.CertifyVuln, error) {
 	var p *model.Package
 	var vuln *model.Vulnerability
 	var err error
 	if filter != nil {
-		p, err = c.buildPackageResponse(link.packageID, filter.Package)
+		p, err = c.buildPackageResponse(ctx, link.packageID, filter.Package)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		p, err = c.buildPackageResponse(link.packageID, nil)
+		p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 		if err != nil {
 			return nil, err
 		}

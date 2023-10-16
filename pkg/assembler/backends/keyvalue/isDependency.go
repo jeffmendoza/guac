@@ -36,7 +36,8 @@ type isDependencyLink struct {
 	collector      string
 }
 
-func (n *isDependencyLink) ID() string { return n.id }
+func (n *isDependencyLink) ID() string  { return n.id }
+func (n *isDependencyLink) Key() string { return n.id }
 
 func (n *isDependencyLink) Neighbors(allowedEdges edgeMap) []string {
 	if allowedEdges[model.EdgeIsDependencyPackage] {
@@ -46,7 +47,7 @@ func (n *isDependencyLink) Neighbors(allowedEdges edgeMap) []string {
 }
 
 func (n *isDependencyLink) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
-	return c.buildIsDependency(n, nil, true)
+	return c.buildIsDependency(ctx, n, nil, true)
 }
 
 // Ingest IngestDependencies
@@ -78,21 +79,13 @@ func (c *demoClient) ingestDependency(ctx context.Context, packageArg model.PkgI
 	// for IsDependency the dependent package will return the ID at the
 	// packageName node. VersionRange will be used to specify the versions are
 	// the attestation relates to
-	packageID, err := getPackageIDFromInput(c, packageArg, model.MatchFlags{Pkg: model.PkgMatchTypeSpecificVersion})
+	foundPkgVersion, err := c.getPackageVerFromInput(ctx, packageArg)
 	if err != nil {
 		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 	}
-	foundPkgVersion, err := byID[*pkgVersionNode](packageID, c)
-	if err != nil {
-		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-	}
-	packageDependencies := foundPkgVersion.isDependencyLinks
+	packageDependencies := foundPkgVersion.IsDependencyLinks
 
-	depPackageID, err := getPackageIDFromInput(c, dependentPackageArg, depPkgMatchType)
-	if err != nil {
-		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-	}
-	depPkg, err := byID[pkgNameOrVersion](depPackageID, c)
+	depPkg, err := c.getPackageNameOrVerFromInput(ctx, dependentPackageArg, depPkgMatchType)
 	if err != nil {
 		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 	}
@@ -113,7 +106,7 @@ func (c *demoClient) ingestDependency(ctx context.Context, packageArg model.PkgI
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		if packageID == v.packageID && depPackageID == v.depPackageID && dependency.Justification == v.justification &&
+		if foundPkgVersion.ThisID == v.packageID && depPkg.ID() == v.depPackageID && dependency.Justification == v.justification &&
 			dependency.Origin == v.origin && dependency.Collector == v.collector &&
 			dependency.VersionRange == v.versionRange && dependency.DependencyType == v.dependencyType {
 
@@ -132,8 +125,8 @@ func (c *demoClient) ingestDependency(ctx context.Context, packageArg model.PkgI
 		// store the link
 		collectedIsDependencyLink = isDependencyLink{
 			id:             c.getNextID(),
-			packageID:      packageID,
-			depPackageID:   depPackageID,
+			packageID:      foundPkgVersion.ThisID,
+			depPackageID:   depPkg.ID(),
 			versionRange:   dependency.VersionRange,
 			dependencyType: dependency.DependencyType,
 			justification:  dependency.Justification,
@@ -148,7 +141,7 @@ func (c *demoClient) ingestDependency(ctx context.Context, packageArg model.PkgI
 	}
 
 	// build return GraphQL type
-	foundIsDependency, err := c.buildIsDependency(&collectedIsDependencyLink, nil, true)
+	foundIsDependency, err := c.buildIsDependency(ctx, &collectedIsDependencyLink, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +160,7 @@ func (c *demoClient) IsDependency(ctx context.Context, filter *model.IsDependenc
 			// Not found
 			return nil, nil
 		}
-		foundIsDependency, err := c.buildIsDependency(link, filter, true)
+		foundIsDependency, err := c.buildIsDependency(ctx, link, filter, true)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
@@ -177,33 +170,33 @@ func (c *demoClient) IsDependency(ctx context.Context, filter *model.IsDependenc
 	var search []string
 	foundOne := false
 	if filter != nil && filter.Package != nil {
-		pkgs, err := c.findPackageVersion(filter.Package)
+		pkgs, err := c.findPackageVersion(ctx, filter.Package)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		foundOne = len(pkgs) > 0
 		for _, pkg := range pkgs {
-			search = append(search, pkg.isDependencyLinks...)
+			search = append(search, pkg.IsDependencyLinks...)
 		}
 	}
 	if !foundOne && filter != nil && filter.DependencyPackage != nil {
 		if filter.DependencyPackage.Version == nil {
-			exactPackage, err := c.exactPackageName(filter.DependencyPackage)
+			exactPackage, err := c.exactPackageName(ctx, filter.DependencyPackage)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
 			if exactPackage != nil {
-				search = append(search, exactPackage.isDependencyLinks...)
+				search = append(search, exactPackage.IsDependencyLinks...)
 				foundOne = true
 			}
 		} else {
-			pkgs, err := c.findPackageVersion(filter.Package)
+			pkgs, err := c.findPackageVersion(ctx, filter.Package)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
 			foundOne = len(pkgs) > 0
 			for _, pkg := range pkgs {
-				search = append(search, pkg.isDependencyLinks...)
+				search = append(search, pkg.IsDependencyLinks...)
 			}
 		}
 	}
@@ -215,7 +208,7 @@ func (c *demoClient) IsDependency(ctx context.Context, filter *model.IsDependenc
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
-			out, err = c.addDepIfMatch(out, filter, link)
+			out, err = c.addDepIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -223,7 +216,7 @@ func (c *demoClient) IsDependency(ctx context.Context, filter *model.IsDependenc
 	} else {
 		for _, link := range c.isDependencies {
 			var err error
-			out, err = c.addDepIfMatch(out, filter, link)
+			out, err = c.addDepIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -233,17 +226,17 @@ func (c *demoClient) IsDependency(ctx context.Context, filter *model.IsDependenc
 	return out, nil
 }
 
-func (c *demoClient) buildIsDependency(link *isDependencyLink, filter *model.IsDependencySpec, ingestOrIDProvided bool) (*model.IsDependency, error) {
+func (c *demoClient) buildIsDependency(ctx context.Context, link *isDependencyLink, filter *model.IsDependencySpec, ingestOrIDProvided bool) (*model.IsDependency, error) {
 	var p *model.Package
 	var dep *model.Package
 	var err error
 	if filter != nil {
-		p, err = c.buildPackageResponse(link.packageID, filter.Package)
+		p, err = c.buildPackageResponse(ctx, link.packageID, filter.Package)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		p, err = c.buildPackageResponse(link.packageID, nil)
+		p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -251,12 +244,12 @@ func (c *demoClient) buildIsDependency(link *isDependencyLink, filter *model.IsD
 	if filter != nil && filter.DependencyPackage != nil {
 		depPkgFilter := &model.PkgSpec{Type: filter.DependencyPackage.Type, Namespace: filter.DependencyPackage.Namespace,
 			Name: filter.DependencyPackage.Name}
-		dep, err = c.buildPackageResponse(link.depPackageID, depPkgFilter)
+		dep, err = c.buildPackageResponse(ctx, link.depPackageID, depPkgFilter)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		dep, err = c.buildPackageResponse(link.depPackageID, nil)
+		dep, err = c.buildPackageResponse(ctx, link.depPackageID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -288,7 +281,7 @@ func (c *demoClient) buildIsDependency(link *isDependencyLink, filter *model.IsD
 	return &foundIsDependency, nil
 }
 
-func (c *demoClient) addDepIfMatch(out []*model.IsDependency,
+func (c *demoClient) addDepIfMatch(ctx context.Context, out []*model.IsDependency,
 	filter *model.IsDependencySpec, link *isDependencyLink) (
 	[]*model.IsDependency, error) {
 	if filter != nil && noMatch(filter.Justification, link.justification) {
@@ -307,7 +300,7 @@ func (c *demoClient) addDepIfMatch(out []*model.IsDependency,
 		return out, nil
 	}
 
-	foundIsDependency, err := c.buildIsDependency(link, filter, false)
+	foundIsDependency, err := c.buildIsDependency(ctx, link, filter, false)
 	if err != nil {
 		return nil, err
 	}

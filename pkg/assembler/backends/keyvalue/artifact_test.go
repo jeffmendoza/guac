@@ -241,12 +241,7 @@ func Test_demoClient_IngestArtifacts(t *testing.T) {
 	}, cmp.Ignore())
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &demoClient{
-				artifacts: artMap{},
-				index:     indexType{},
-				kv:        &memmap.Store{},
-			}
-
+			c, _ := getBackend(ctx, nil)
 			got, err := c.IngestArtifacts(ctx, tt.artifactInputs)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("demoClient.IngestArtifact() error = %v, wantErr %v", err, tt.wantErr)
@@ -306,11 +301,7 @@ func Test_demoClient_IngestArtifact(t *testing.T) {
 	}, cmp.Ignore())
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &demoClient{
-				artifacts: artMap{},
-				index:     indexType{},
-				kv:        &memmap.Store{},
-			}
+			c, _ := getBackend(ctx, nil)
 
 			got, err := c.IngestArtifact(ctx, tt.artifactInput)
 			if (err != nil) != tt.wantErr {
@@ -385,11 +376,7 @@ func Test_demoClient_Artifacts(t *testing.T) {
 	}, cmp.Ignore())
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &demoClient{
-				artifacts: artMap{},
-				index:     indexType{},
-				kv:        &memmap.Store{},
-			}
+			c, _ := getBackend(ctx, nil)
 			ingestedArt, err := c.IngestArtifact(ctx, tt.artifactInput)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("demoClient.IngestArtifact() error = %v, wantErr %v", err, tt.wantErr)
@@ -471,11 +458,7 @@ func Test_demoClient_buildArtifactResponse(t *testing.T) {
 	}, cmp.Ignore())
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &demoClient{
-				artifacts: artMap{},
-				index:     indexType{},
-				kv:        &memmap.Store{},
-			}
+			c, _ := getBackend(ctx, nil)
 			art, err := c.IngestArtifact(ctx, tt.artifactInput)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("demoClient.IngestArtifact() error = %v, wantErr %v", err, tt.wantErr)
@@ -484,7 +467,8 @@ func Test_demoClient_buildArtifactResponse(t *testing.T) {
 			if tt.idInFilter {
 				tt.artifactSpec.ID = &art.ID
 			}
-			got, err := c.buildArtifactResponse(context.Background(), art.ID, tt.artifactSpec)
+			b := c.(*demoClient)
+			got, err := b.buildArtifactResponse(context.Background(), art.ID, tt.artifactSpec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("demoClient.Artifacts() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -529,17 +513,14 @@ func Test_demoClient_getArtifactIDFromInput(t *testing.T) {
 	}, cmp.Ignore())
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &demoClient{
-				artifacts: artMap{},
-				index:     indexType{},
-				kv:        &memmap.Store{},
-			}
+			c, _ := getBackend(ctx, nil)
 			art, err := c.IngestArtifact(ctx, tt.artifactInput)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("demoClient.IngestArtifact() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got, err := c.artifactIDByInput(context.Background(), tt.artifactInput)
+			b := c.(*demoClient)
+			got, err := b.artifactIDByInput(context.Background(), tt.artifactInput)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("demoClient.Artifacts() error = %v, wantErr %v", err, tt.wantErr)
 				return

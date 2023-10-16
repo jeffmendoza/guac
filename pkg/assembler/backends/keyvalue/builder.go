@@ -31,6 +31,10 @@ type builderStruct struct {
 	hasSLSAs []string
 }
 
+func (n *builderStruct) Key() string {
+	return ""
+}
+
 func (b *builderStruct) ID() string { return b.id }
 
 func (b *builderStruct) Neighbors(allowedEdges edgeMap) []string {

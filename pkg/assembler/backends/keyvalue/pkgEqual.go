@@ -44,7 +44,7 @@ func (n *pkgEqualStruct) Neighbors(allowedEdges edgeMap) []string {
 }
 
 func (n *pkgEqualStruct) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
-	return c.convPkgEqual(n)
+	return c.convPkgEqual(ctx, n)
 }
 
 // Ingest PkgEqual
@@ -61,7 +61,7 @@ func (c *demoClient) IngestPkgEquals(ctx context.Context, pkgs []*model.PkgInput
 	return modelPkgEqualsIDs, nil
 }
 
-func (c *demoClient) convPkgEqual(in *pkgEqualStruct) (*model.PkgEqual, error) {
+func (c *demoClient) convPkgEqual(ctx context.Context, in *pkgEqualStruct) (*model.PkgEqual, error) {
 	out := &model.PkgEqual{
 		ID:            in.id,
 		Justification: in.justification,
@@ -69,7 +69,7 @@ func (c *demoClient) convPkgEqual(in *pkgEqualStruct) (*model.PkgEqual, error) {
 		Collector:     in.collector,
 	}
 	for _, id := range in.pkgs {
-		p, err := c.buildPackageResponse(id, nil)
+		p, err := c.buildPackageResponse(ctx, id, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -25,40 +25,6 @@ import (
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
 )
 
-// TODO: move this into a unit test for this file
-// func registerAllSources(client *demoClient) {
-// 	ctx := context.Background()
-// 	v12 := "v2.12.0"
-// 	commit := "abcdef"
-
-// 	inputs := []model.SourceInputSpec{{
-// 		Type:      "git",
-// 		Namespace: "github.com",
-// 		Name:      "tensorflow",
-// 	}, {
-// 		Type:      "git",
-// 		Namespace: "github.com",
-// 		Name:      "build",
-// 	}, {
-// 		Type:      "git",
-// 		Namespace: "github.com",
-// 		Name:      "tensorflow",
-// 		Tag:       &v12,
-// 	}, {
-// 		Type:      "git",
-// 		Namespace: "github.com",
-// 		Name:      "tensorflow",
-// 		Commit:    &commit,
-// 	}}
-
-// 	for _, input := range inputs {
-// 		_, err := client.IngestSource(ctx, input)
-// 		if err != nil {
-// 			log.Printf("Error in ingesting: %v\n", err)
-// 		}
-// 	}
-// }
-
 // Internal data: Sources
 type srcTypeMap map[string]*srcNamespaceStruct
 type srcNamespaceStruct struct {
@@ -93,6 +59,10 @@ type srcNameNode struct {
 func (n *srcNamespaceStruct) ID() string { return n.id }
 func (n *srcNameStruct) ID() string      { return n.id }
 func (n *srcNameNode) ID() string        { return n.id }
+
+func (n *srcNamespaceStruct) Key() string { return n.id }
+func (n *srcNameStruct) Key() string      { return n.id }
+func (n *srcNameNode) Key() string        { return n.id }
 
 func (n *srcNamespaceStruct) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, len(n.namespaces))
