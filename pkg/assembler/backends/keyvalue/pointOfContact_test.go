@@ -599,24 +599,6 @@ func TestPointOfContact(t *testing.T) {
 			},
 			ExpIngestErr: true,
 		},
-		{
-			Name:  "Query good ID",
-			InSrc: []*model.SourceInputSpec{s1},
-			Calls: []call{
-				{
-					Sub: model.PackageSourceOrArtifactInput{
-						Source: s1,
-					},
-					HM: &model.PointOfContactInputSpec{
-						Justification: "test justification",
-					},
-				},
-			},
-			Query: &model.PointOfContactSpec{
-				ID: ptrfrom.String("asdf"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

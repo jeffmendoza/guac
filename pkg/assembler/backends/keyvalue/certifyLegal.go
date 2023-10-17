@@ -129,6 +129,7 @@ func (c *demoClient) ingestCertifyLegal(ctx context.Context, subject model.Packa
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
 		backedgeSearch = pkg.CertifyLegals
+		packageID = pkg.ID()
 	}
 
 	var sourceID string
@@ -187,7 +188,9 @@ func (c *demoClient) ingestCertifyLegal(ctx context.Context, subject model.Packa
 	}
 	c.index[cl.id] = cl
 	if packageID != "" {
-		pkg.setCertifyLegals(cl.id)
+		if err := pkg.setCertifyLegals(ctx, cl.id, c); err != nil {
+			return nil, err
+		}
 	} else {
 		src.setCertifyLegals(cl.id)
 	}

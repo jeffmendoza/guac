@@ -36,12 +36,12 @@ func GetStore() kv.Store {
 func (s *Store) Get(_ context.Context, c, k string) (string, error) {
 	col, ok := s.m[c]
 	if !ok {
-		return "", fmt.Errorf("%w : %s", kv.CollectionError, c)
+		return "", fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
 	}
 
 	val, ok := col[k]
 	if !ok {
-		return "", fmt.Errorf("%w : %s", kv.KeyError, k)
+		return "", fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
 	}
 	return val, nil
 }
@@ -56,7 +56,7 @@ func (s *Store) Set(_ context.Context, c, k, v string) error {
 
 func (s *Store) Keys(_ context.Context, c string) ([]string, error) {
 	if s.m[c] == nil {
-		return nil, fmt.Errorf("%w : %s", kv.CollectionError, c)
+		return nil, nil
 	}
 	return maps.Keys(s.m[c]), nil
 }

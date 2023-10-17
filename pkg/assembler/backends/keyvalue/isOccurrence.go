@@ -17,12 +17,13 @@ package keyvalue
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
+	"github.com/guacsec/guac/pkg/assembler/kv"
 )
 
 // Internal isOccurrence
@@ -138,15 +139,13 @@ func (c *demoClient) ingestOccurrence(ctx context.Context, subject model.Package
 		in.Source = sid
 	}
 
-	out, err := byKeykv[*isOccurrenceStruct](ctx, in.Key(), occCol, c)
+	out, err := byKeykv[*isOccurrenceStruct](ctx, occCol, in.Key(), c)
 	if err == nil {
-		//fmt.Printf("return existing: %q %q %q\n", in.Artifact, out.Artifact, out.ThisID)
 		return c.convOccurrence(ctx, out)
 	}
-	// FIXME, redis should catch key error and convert to these
-	// if !errors.Is(err, kv.KeyError) && !errors.Is(err, kv.CollectionError) {
-	// 	return nil, err
-	// }
+	if !errors.Is(err, kv.NotFoundError) {
+		return nil, err
+	}
 
 	if readOnly {
 		c.m.RUnlock()
@@ -158,11 +157,13 @@ func (c *demoClient) ingestOccurrence(ctx context.Context, subject model.Package
 	if err := c.addToIndex(ctx, occCol, in); err != nil {
 		return nil, err
 	}
-	if err := a.AddOcc(ctx, in.ThisID, c); err != nil {
+	if err := a.setOccurrences(ctx, in.ThisID, c); err != nil {
 		return nil, err
 	}
 	if pkgVer != nil {
-		pkgVer.setOccurrenceLinks(in.ThisID)
+		if err := pkgVer.setOccurrenceLinks(ctx, in.ThisID, c); err != nil {
+			return nil, err
+		}
 	} else {
 		s, err := byID[*srcNameNode](sourceID, c)
 		if err != nil {
@@ -286,7 +287,6 @@ func (c *demoClient) IsOccurrence(ctx context.Context, filter *model.IsOccurrenc
 		for _, id := range search {
 			link, err := byIDkv[*isOccurrenceStruct](ctx, id, c)
 			if err != nil {
-				fmt.Printf("error 4 %v\n", err)
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
 			out, err = c.addOccIfMatch(ctx, out, filter, link)
@@ -300,9 +300,8 @@ func (c *demoClient) IsOccurrence(ctx context.Context, filter *model.IsOccurrenc
 			return nil, err
 		}
 		for _, ok := range occKeys {
-			link, err := byKeykv[*isOccurrenceStruct](ctx, ok, occCol, c)
+			link, err := byKeykv[*isOccurrenceStruct](ctx, occCol, ok, c)
 			if err != nil {
-				fmt.Printf("error 3 %v\n", err)
 				return nil, err
 			}
 			out, err = c.addOccIfMatch(ctx, out, filter, link)

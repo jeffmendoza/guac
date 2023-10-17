@@ -36,7 +36,8 @@ type vulnerabilityMetadataLink struct {
 	collector       string
 }
 
-func (n *vulnerabilityMetadataLink) ID() string { return n.id }
+func (n *vulnerabilityMetadataLink) ID() string  { return n.id }
+func (n *vulnerabilityMetadataLink) Key() string { return n.id }
 
 func (n *vulnerabilityMetadataLink) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 1)

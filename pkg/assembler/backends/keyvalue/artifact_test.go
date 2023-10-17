@@ -24,7 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/guacsec/guac/internal/testing/ptrfrom"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
-	"github.com/guacsec/guac/pkg/assembler/kv/memmap"
 )
 
 func Test_artifactStruct_ID(t *testing.T) {
@@ -115,12 +114,12 @@ func Test_artifactStruct_Neighbors(t *testing.T) {
 				ThisID:      tt.fields.id,
 				Algorithm:   tt.fields.algorithm,
 				Digest:      tt.fields.digest,
-				hashEquals:  tt.fields.hashEquals,
+				HashEquals:  tt.fields.hashEquals,
 				Occurrences: tt.fields.occurrences,
-				hasSLSAs:    tt.fields.hasSLSAs,
-				vexLinks:    tt.fields.vexLinks,
-				badLinks:    tt.fields.badLinks,
-				goodLinks:   tt.fields.goodLinks,
+				HasSLSAs:    tt.fields.hasSLSAs,
+				VexLinks:    tt.fields.vexLinks,
+				BadLinks:    tt.fields.badLinks,
+				GoodLinks:   tt.fields.goodLinks,
 			}
 			if got := a.Neighbors(tt.allowedEdges); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("builderStruct.Neighbors() = %v, want %v", got, tt.want)
@@ -182,17 +181,14 @@ func Test_artifactStruct_BuildModelNode(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &demoClient{
-				artifacts: artMap{},
-				index:     indexType{},
-				kv:        &memmap.Store{},
-			}
+			c, _ := getBackend(context.Background(), nil)
 			a := &artStruct{
 				ThisID:    tt.fields.id,
 				Algorithm: tt.fields.algorithm,
 				Digest:    tt.fields.digest,
 			}
-			got, err := a.BuildModelNode(context.Background(), c)
+			b := c.(*demoClient)
+			got, err := a.BuildModelNode(context.Background(), b)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("artStruct.BuildModelNode() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -520,12 +516,12 @@ func Test_demoClient_getArtifactIDFromInput(t *testing.T) {
 				return
 			}
 			b := c.(*demoClient)
-			got, err := b.artifactIDByInput(context.Background(), tt.artifactInput)
+			got, err := b.artifactByInput(context.Background(), tt.artifactInput)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("demoClient.Artifacts() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if diff := cmp.Diff(art.ID, got, ignoreID); diff != "" {
+			if diff := cmp.Diff(art.ID, got.ThisID, ignoreID); diff != "" {
 				t.Errorf("Unexpected results. (-want +got):\n%s", diff)
 			}
 		})

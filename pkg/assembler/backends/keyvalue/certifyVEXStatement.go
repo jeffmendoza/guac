@@ -115,7 +115,7 @@ func (c *demoClient) ingestVEXStatement(ctx context.Context, subject model.Packa
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		subjectVexLinks = foundArtStrct.vexLinks
+		subjectVexLinks = foundArtStrct.VexLinks
 	}
 
 	var vulnerabilityVexLinks []string
@@ -189,10 +189,14 @@ func (c *demoClient) ingestVEXStatement(ctx context.Context, subject model.Packa
 		c.vexs = append(c.vexs, &collectedCertifyVexLink)
 		// set the backlinks
 		if packageID != "" {
-			foundPkgVersionNode.setVexLinks(collectedCertifyVexLink.id)
+			if err := foundPkgVersionNode.setVexLinks(ctx, collectedCertifyVexLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 		if artifactID != "" {
-			foundArtStrct.setVexLinks(collectedCertifyVexLink.id)
+			if err := foundArtStrct.setVexLinks(ctx, collectedCertifyVexLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 		if vulnID != "" {
 			foundVulnNode.setVexLinks(collectedCertifyVexLink.id)
@@ -236,7 +240,7 @@ func (c *demoClient) CertifyVEXStatement(ctx context.Context, filter *model.Cert
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactArtifact != nil {
-			search = append(search, exactArtifact.vexLinks...)
+			search = append(search, exactArtifact.VexLinks...)
 			foundOne = true
 		}
 	}

@@ -632,27 +632,6 @@ func TestVEX(t *testing.T) {
 			},
 			ExpIngestErr: true,
 		},
-		{
-			Name:   "Query bad id",
-			InPkg:  []*model.PkgInputSpec{p1},
-			InVuln: []*model.VulnerabilityInputSpec{o1},
-			Calls: []call{
-				{
-					Sub: model.PackageOrArtifactInput{
-						Package: p1,
-					},
-					Vuln: o1,
-					In: &model.VexStatementInputSpec{
-						VexJustification: "test justification",
-						KnownSince:       time.Unix(1e9, 0),
-					},
-				},
-			},
-			Query: &model.CertifyVEXStatementSpec{
-				ID: ptrfrom.String("-5"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

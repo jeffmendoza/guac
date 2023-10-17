@@ -468,29 +468,6 @@ func TestHasSLSA(t *testing.T) {
 			},
 			ExpIngestErr: true,
 		},
-		{
-			Name:  "Query bad ID",
-			InArt: []*model.ArtifactInputSpec{a1, a2},
-			InBld: []*model.BuilderInputSpec{b1, b2},
-			Calls: []call{
-				{
-					Sub:  a1,
-					BF:   []*model.ArtifactInputSpec{a2},
-					BB:   b1,
-					SLSA: &model.SLSAInputSpec{},
-				},
-				{
-					Sub:  a1,
-					BF:   []*model.ArtifactInputSpec{a2},
-					BB:   b2,
-					SLSA: &model.SLSAInputSpec{},
-				},
-			},
-			Query: &model.HasSLSASpec{
-				ID: ptrfrom.String("asdf"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

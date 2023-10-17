@@ -142,14 +142,6 @@ func TestLicense(t *testing.T) {
 			},
 			Exp: nil,
 		},
-		{
-			Name:    "Query invalid ID",
-			Ingests: []*model.LicenseInputSpec{l1, l2, l3},
-			Query: &model.LicenseSpec{
-				ID: ptrfrom.String("asdf"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

@@ -17,12 +17,14 @@ package keyvalue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
+	"github.com/guacsec/guac/pkg/assembler/kv"
 )
 
 // Internal data: Artifacts
@@ -31,15 +33,15 @@ type artStruct struct {
 	ThisID              string
 	Algorithm           string
 	Digest              string
-	hashEquals          []string
+	HashEquals          []string
 	Occurrences         []string
-	hasSBOMs            []string
-	hasSLSAs            []string
-	vexLinks            []string
-	badLinks            []string
-	goodLinks           []string
-	hasMetadataLinks    []string
-	pointOfContactLinks []string
+	HasSBOMs            []string
+	HasSLSAs            []string
+	VexLinks            []string
+	BadLinks            []string
+	GoodLinks           []string
+	HasMetadataLinks    []string
+	PointOfContactLinks []string
 }
 
 func (n *artStruct) ID() string { return n.ThisID }
@@ -47,31 +49,31 @@ func (n *artStruct) ID() string { return n.ThisID }
 func (n *artStruct) Neighbors(allowedEdges edgeMap) []string {
 	out := []string{}
 	if allowedEdges[model.EdgeArtifactHashEqual] {
-		out = append(out, n.hashEquals...)
+		out = append(out, n.HashEquals...)
 	}
 	if allowedEdges[model.EdgeArtifactIsOccurrence] {
 		out = append(out, n.Occurrences...)
 	}
 	if allowedEdges[model.EdgeArtifactHasSbom] {
-		out = append(out, n.hasSBOMs...)
+		out = append(out, n.HasSBOMs...)
 	}
 	if allowedEdges[model.EdgeArtifactHasSlsa] {
-		out = append(out, n.hasSLSAs...)
+		out = append(out, n.HasSLSAs...)
 	}
 	if allowedEdges[model.EdgeArtifactCertifyVexStatement] {
-		out = append(out, n.vexLinks...)
+		out = append(out, n.VexLinks...)
 	}
 	if allowedEdges[model.EdgeArtifactCertifyBad] {
-		out = append(out, n.badLinks...)
+		out = append(out, n.BadLinks...)
 	}
 	if allowedEdges[model.EdgeArtifactCertifyGood] {
-		out = append(out, n.goodLinks...)
+		out = append(out, n.GoodLinks...)
 	}
 	if allowedEdges[model.EdgeArtifactHasMetadata] {
-		out = append(out, n.hasMetadataLinks...)
+		out = append(out, n.HasMetadataLinks...)
 	}
 	if allowedEdges[model.EdgeArtifactPointOfContact] {
-		out = append(out, n.pointOfContactLinks...)
+		out = append(out, n.PointOfContactLinks...)
 	}
 
 	return out
@@ -81,50 +83,46 @@ func (n *artStruct) BuildModelNode(ctx context.Context, c *demoClient) (model.No
 	return c.convArtifact(n), nil
 }
 
-func (n *artStruct) setHashEquals(ID string) { n.hashEquals = append(n.hashEquals, ID) }
-
-// func (n *artStruct) setOccurrences(ID string)      { n.occurrences = append(n.occurrences, ID) }
-func (n *artStruct) setHasSBOMs(ID string)         { n.hasSBOMs = append(n.hasSBOMs, ID) }
-func (n *artStruct) setHasSLSAs(ID string)         { n.hasSLSAs = append(n.hasSLSAs, ID) }
-func (n *artStruct) setVexLinks(ID string)         { n.vexLinks = append(n.vexLinks, ID) }
-func (n *artStruct) setCertifyBadLinks(ID string)  { n.badLinks = append(n.badLinks, ID) }
-func (n *artStruct) setCertifyGoodLinks(ID string) { n.goodLinks = append(n.goodLinks, ID) }
-func (n *artStruct) setHasMetadataLinks(ID string) {
-	n.hasMetadataLinks = append(n.hasMetadataLinks, ID)
+func (n *artStruct) setOccurrences(ctx context.Context, ID string, c *demoClient) error {
+	n.Occurrences = append(n.Occurrences, ID)
+	return setkv(ctx, artCol, n, c)
 }
-func (n *artStruct) setPointOfContactLinks(ID string) {
-	n.pointOfContactLinks = append(n.pointOfContactLinks, ID)
+func (n *artStruct) setHashEquals(ctx context.Context, ID string, c *demoClient) error {
+	n.HashEquals = append(n.HashEquals, ID)
+	return setkv(ctx, artCol, n, c)
+}
+func (n *artStruct) setHasSBOMs(ctx context.Context, ID string, c *demoClient) error {
+	n.HasSBOMs = append(n.HasSBOMs, ID)
+	return setkv(ctx, artCol, n, c)
+}
+func (n *artStruct) setHasSLSAs(ctx context.Context, ID string, c *demoClient) error {
+	n.HasSLSAs = append(n.HasSLSAs, ID)
+	return setkv(ctx, artCol, n, c)
+}
+func (n *artStruct) setVexLinks(ctx context.Context, ID string, c *demoClient) error {
+	n.VexLinks = append(n.VexLinks, ID)
+	return setkv(ctx, artCol, n, c)
+}
+func (n *artStruct) setCertifyBadLinks(ctx context.Context, ID string, c *demoClient) error {
+	n.BadLinks = append(n.BadLinks, ID)
+	return setkv(ctx, artCol, n, c)
+}
+func (n *artStruct) setCertifyGoodLinks(ctx context.Context, ID string, c *demoClient) error {
+	n.GoodLinks = append(n.GoodLinks, ID)
+	return setkv(ctx, artCol, n, c)
+}
+func (n *artStruct) setHasMetadataLinks(ctx context.Context, ID string, c *demoClient) error {
+	n.HasMetadataLinks = append(n.HasMetadataLinks, ID)
+	return setkv(ctx, artCol, n, c)
+}
+func (n *artStruct) setPointOfContactLinks(ctx context.Context, ID string, c *demoClient) error {
+	n.PointOfContactLinks = append(n.PointOfContactLinks, ID)
+	return setkv(ctx, artCol, n, c)
 }
 
 func (n *artStruct) Key() string {
 	return strings.Join([]string{n.Algorithm, n.Digest}, ":")
 }
-
-func (n *artStruct) AddOcc(ctx context.Context, occ string, c *demoClient) error {
-	n.Occurrences = append(n.Occurrences, occ)
-	return setkv(ctx, artCol, n, c)
-}
-
-// func (c *demoClient) artifactSetOccurrences(ctx context.Context, aID string, oID string) error {
-// 	a, err := byIDkv[*artStruct](ctx, aID, c)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	a.Occurrences = append(a.Occurrences, oID)
-// 	return c.artifactSet(ctx, a)
-// }
-
-// func (c *demoClient) artifactByKey(ctx context.Context, k string) (*artStruct, error) {
-// 	strval, err := c.kv.Get(ctx, artCol, k)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	a := &artStruct{}
-// 	if err = json.Unmarshal([]byte(strval), a); err != nil {
-// 		return nil, err
-// 	}
-// 	return a, nil
-// }
 
 func (c *demoClient) artifactByInput(ctx context.Context, a *model.ArtifactInputSpec) (*artStruct, error) {
 	inA := &artStruct{
@@ -133,22 +131,6 @@ func (c *demoClient) artifactByInput(ctx context.Context, a *model.ArtifactInput
 	}
 	return byKeykv[*artStruct](ctx, artCol, inA.Key(), c)
 }
-
-// func (c *demoClient) artifactIDByInput(ctx context.Context, a *model.ArtifactInputSpec) (string, error) {
-// 	art, err := c.artifactByInput(ctx, a)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return art.ThisID, nil
-// }
-
-// func (c *demoClient) artifactSet(ctx context.Context, a *artStruct) error {
-// 	byteval, err := json.Marshal(a)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return c.kv.Set(ctx, artCol, artifactKey(a.Algorithm, a.Digest), string(byteval))
-// }
 
 func (c *demoClient) artifactModelByID(ctx context.Context, id string) (*model.Artifact, error) {
 	a, err := byIDkv[*artStruct](ctx, id, c)
@@ -191,10 +173,9 @@ func (c *demoClient) ingestArtifact(ctx context.Context, artifact *model.Artifac
 	outA, err := byKeykv[*artStruct](ctx, artCol, inA.Key(), c)
 
 	if err != nil {
-		// FIXME, redis should catch key error and convert to these
-		// if !errors.Is(err, kv.KeyError) && !errors.Is(err, kv.CollectionError) {
-		// 	return nil, err
-		// }
+		if !errors.Is(err, kv.NotFoundError) {
+			return nil, err
+		}
 		// Got KeyError: not found, so do insert
 		if readOnly {
 			c.m.RUnlock()
@@ -206,7 +187,7 @@ func (c *demoClient) ingestArtifact(ctx context.Context, artifact *model.Artifac
 		if err := c.addToIndex(ctx, artCol, inA); err != nil {
 			return nil, err
 		}
-		if setkv(ctx, artCol, inA, c); err != nil {
+		if err := setkv(ctx, artCol, inA, c); err != nil {
 			return nil, err
 		}
 		outA = inA
@@ -219,7 +200,7 @@ func (c *demoClient) artifactExact(ctx context.Context, artifactSpec *model.Arti
 	algorithm := strings.ToLower(nilToEmpty(artifactSpec.Algorithm))
 	digest := strings.ToLower(nilToEmpty(artifactSpec.Digest))
 
-	// If ID is provided, try to look up, then check if algo and digest match.
+	// If ID is provided, try to look up
 	if artifactSpec.ID != nil {
 		a, err := byIDkv[*artStruct](ctx, *artifactSpec.ID, c)
 		if err != nil {

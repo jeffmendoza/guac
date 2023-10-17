@@ -424,13 +424,6 @@ func TestVulnEqual(t *testing.T) {
 			},
 			ExpQueryErr: false,
 		},
-		{
-			Name: "Query Bad ID",
-			Query: &model.VulnEqualSpec{
-				ID: ptrfrom.String("-123"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

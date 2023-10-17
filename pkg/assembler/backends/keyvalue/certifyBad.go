@@ -103,9 +103,9 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 	lock(&c.m, readOnly)
 	defer unlock(&c.m, readOnly)
 
-	var packageID string
 	var foundPkgNameorVersionNode pkgNameOrVersion
 	var foundArtStruct *artStruct
+
 	var sourceID string
 	var srcName *srcNameNode
 	var searchIDs []string
@@ -122,7 +122,7 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		searchIDs = foundArtStruct.badLinks
+		searchIDs = foundArtStruct.BadLinks
 	} else {
 		var err error
 		sourceID, err = getSourceIDFromInput(c, *subject.Source)
@@ -145,9 +145,9 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
 		subjectMatch := false
-		if packageID != "" && packageID == v.packageID {
-			subjectMatch = true
-		}
+		// if packageID != "" && packageID == v.packageID { FIXME
+		// 	subjectMatch = true
+		// }
 		if foundArtStruct != nil && foundArtStruct.ThisID == v.artifactID {
 			subjectMatch = true
 		}
@@ -172,9 +172,9 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 		}
 		// store the link
 		collectedCertifyBadLink = badLink{
-			id:            c.getNextID(),
-			packageID:     packageID,
-			artifactID:    foundArtStruct.ThisID,
+			id: c.getNextID(),
+			//packageID: packageID, FIXME
+			//artifactID:    foundArtStruct.ThisID,
 			sourceID:      sourceID,
 			justification: certifyBad.Justification,
 			origin:        certifyBad.Origin,
@@ -184,11 +184,13 @@ func (c *demoClient) ingestCertifyBad(ctx context.Context, subject model.Package
 		c.index[collectedCertifyBadLink.id] = &collectedCertifyBadLink
 		c.certifyBads = append(c.certifyBads, &collectedCertifyBadLink)
 		// set the backlinks
-		if packageID != "" {
-			foundPkgNameorVersionNode.setCertifyBadLinks(collectedCertifyBadLink.id)
-		}
+		// if packageID != "" { FIXME
+		// 	foundPkgNameorVersionNode.setCertifyBadLinks(collectedCertifyBadLink.id)
+		// }
 		if foundArtStruct != nil {
-			foundArtStruct.setCertifyBadLinks(collectedCertifyBadLink.id)
+			if err := foundArtStruct.setCertifyBadLinks(ctx, collectedCertifyBadLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 		if sourceID != "" {
 			srcName.setCertifyBadLinks(collectedCertifyBadLink.id)
@@ -234,7 +236,7 @@ func (c *demoClient) CertifyBad(ctx context.Context, filter *model.CertifyBadSpe
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactArtifact != nil {
-			search = append(search, exactArtifact.badLinks...)
+			search = append(search, exactArtifact.BadLinks...)
 			foundOne = true
 		}
 	}

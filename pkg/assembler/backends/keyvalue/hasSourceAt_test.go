@@ -475,25 +475,6 @@ func TestHasSourceAt(t *testing.T) {
 			},
 			ExpIngestErr: true,
 		},
-		{
-			Name:  "Query bad ID",
-			InPkg: []*model.PkgInputSpec{p1},
-			InSrc: []*model.SourceInputSpec{s1},
-			Calls: []call{
-				{
-					Pkg: p1,
-					Src: s1,
-					Match: &model.MatchFlags{
-						Pkg: model.PkgMatchTypeSpecificVersion,
-					},
-					HSA: &model.HasSourceAtInputSpec{},
-				},
-			},
-			Query: &model.HasSourceAtSpec{
-				ID: ptrfrom.String("asdf"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

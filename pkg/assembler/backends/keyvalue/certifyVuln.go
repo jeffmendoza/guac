@@ -151,7 +151,9 @@ func (c *demoClient) ingestVulnerability(ctx context.Context, packageArg model.P
 		c.index[collectedCertifyVulnLink.id] = &collectedCertifyVulnLink
 		c.certifyVulnerabilities = append(c.certifyVulnerabilities, &collectedCertifyVulnLink)
 		// set the backlinks
-		foundPackage.setVulnerabilityLinks(collectedCertifyVulnLink.id)
+		if err := foundPackage.setVulnerabilityLinks(ctx, collectedCertifyVulnLink.id, c); err != nil {
+			return nil, err
+		}
 		if vulnID != "" {
 			foundVulnNode.setVulnerabilityLinks(collectedCertifyVulnLink.id)
 		}

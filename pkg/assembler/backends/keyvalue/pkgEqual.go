@@ -34,7 +34,8 @@ type (
 	}
 )
 
-func (n *pkgEqualStruct) ID() string { return n.id }
+func (n *pkgEqualStruct) ID() string  { return n.id }
+func (n *pkgEqualStruct) Key() string { return n.id }
 
 func (n *pkgEqualStruct) Neighbors(allowedEdges edgeMap) []string {
 	if allowedEdges[model.EdgePkgEqualPackage] {
@@ -88,22 +89,18 @@ func (c *demoClient) ingestPkgEqual(ctx context.Context, pkg model.PkgInputSpec,
 	defer unlock(&c.m, readOnly)
 
 	pIDs := make([]string, 0, 2)
+	ps := make([]*pkgVersion, 0, 2)
 	for _, pi := range []model.PkgInputSpec{pkg, depPkg} {
-		pid, err := getPackageIDFromInput(c, pi, model.MatchFlags{Pkg: model.PkgMatchTypeSpecificVersion})
+		p, err := c.getPackageVerFromInput(ctx, pi)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
-		pIDs = append(pIDs, pid)
+		ps = append(ps, p)
+		pIDs = append(pIDs, p.ThisID)
 	}
 	slices.Sort(pIDs)
 
-	ps := make([]*pkgVersionNode, 0, 2)
-	for _, pID := range pIDs {
-		p, _ := byID[*pkgVersionNode](pID, c)
-		ps = append(ps, p)
-	}
-
-	for _, id := range ps[0].pkgEquals {
+	for _, id := range ps[0].PkgEquals {
 		cp, err := byID[*pkgEqualStruct](id, c)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
@@ -112,7 +109,7 @@ func (c *demoClient) ingestPkgEqual(ctx context.Context, pkg model.PkgInputSpec,
 			cp.justification == pkgEqual.Justification &&
 			cp.origin == pkgEqual.Origin &&
 			cp.collector == pkgEqual.Collector {
-			return c.convPkgEqual(cp)
+			return c.convPkgEqual(ctx, cp)
 		}
 	}
 
@@ -132,11 +129,13 @@ func (c *demoClient) ingestPkgEqual(ctx context.Context, pkg model.PkgInputSpec,
 	}
 	c.index[cp.id] = cp
 	for _, p := range ps {
-		p.setPkgEquals(cp.id)
+		if err := p.setPkgEquals(ctx, cp.id, c); err != nil {
+			return nil, err
+		}
 	}
 	c.pkgEquals = append(c.pkgEquals, cp)
 
-	return c.convPkgEqual(cp)
+	return c.convPkgEqual(ctx, cp)
 }
 
 // Query PkgEqual
@@ -152,7 +151,7 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 			return nil, nil
 		}
 		// If found by id, ignore rest of fields in spec and return as a match
-		pe, err := c.convPkgEqual(link)
+		pe, err := c.convPkgEqual(ctx, link)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
@@ -161,12 +160,12 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 
 	var search []string
 	for _, p := range filter.Packages {
-		pkgs, err := c.findPackageVersion(p)
+		pkgs, err := c.findPackageVersion(ctx, p)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		for _, pkg := range pkgs {
-			search = append(search, pkg.pkgEquals...)
+			search = append(search, pkg.PkgEquals...)
 		}
 	}
 
@@ -177,7 +176,7 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
-			out, err = c.addCPIfMatch(out, filter, link)
+			out, err = c.addCPIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -185,7 +184,7 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 	} else {
 		for _, link := range c.pkgEquals {
 			var err error
-			out, err = c.addCPIfMatch(out, filter, link)
+			out, err = c.addCPIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -194,7 +193,7 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 	return out, nil
 }
 
-func (c *demoClient) addCPIfMatch(out []*model.PkgEqual,
+func (c *demoClient) addCPIfMatch(ctx context.Context, out []*model.PkgEqual,
 	filter *model.PkgEqualSpec, link *pkgEqualStruct) (
 	[]*model.PkgEqual, error,
 ) {
@@ -209,7 +208,7 @@ func (c *demoClient) addCPIfMatch(out []*model.PkgEqual,
 		}
 		found := false
 		for _, pid := range link.pkgs {
-			p, err := c.buildPackageResponse(pid, ps)
+			p, err := c.buildPackageResponse(ctx, pid, ps)
 			if err != nil {
 				return nil, err
 			}
@@ -221,7 +220,7 @@ func (c *demoClient) addCPIfMatch(out []*model.PkgEqual,
 			return out, nil
 		}
 	}
-	pe, err := c.convPkgEqual(link)
+	pe, err := c.convPkgEqual(ctx, link)
 	if err != nil {
 		return nil, err
 	}

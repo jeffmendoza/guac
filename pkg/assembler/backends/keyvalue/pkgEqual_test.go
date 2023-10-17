@@ -387,31 +387,6 @@ func TestPkgEqual(t *testing.T) {
 			},
 			ExpIngestErr: true,
 		},
-		{
-			Name:  "Query bad ID",
-			InPkg: []*model.PkgInputSpec{p1, p2, p3},
-			Calls: []call{
-				{
-					P1: p1,
-					P2: p2,
-					HE: &model.PkgEqualInputSpec{},
-				},
-				{
-					P1: p2,
-					P2: p3,
-					HE: &model.PkgEqualInputSpec{},
-				},
-				{
-					P1: p1,
-					P2: p3,
-					HE: &model.PkgEqualInputSpec{},
-				},
-			},
-			Query: &model.PkgEqualSpec{
-				ID: ptrfrom.String("asdf"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

@@ -122,7 +122,7 @@ func (c *demoClient) ingestCertifyGood(ctx context.Context, subject model.Packag
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		searchIDs = append(searchIDs, foundArtStrct.goodLinks...)
+		searchIDs = append(searchIDs, foundArtStrct.GoodLinks...)
 	} else {
 		var err error
 		sourceID, err = getSourceIDFromInput(c, *subject.Source)
@@ -185,10 +185,14 @@ func (c *demoClient) ingestCertifyGood(ctx context.Context, subject model.Packag
 		c.certifyGoods = append(c.certifyGoods, &collectedCertifyGoodLink)
 		// set the backlinks
 		if packageID != "" {
-			foundPkgNameorVersionNode.setCertifyGoodLinks(collectedCertifyGoodLink.id)
+			if err := foundPkgNameorVersionNode.setCertifyGoodLinks(ctx, collectedCertifyGoodLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 		if artifactID != "" {
-			foundArtStrct.setCertifyGoodLinks(collectedCertifyGoodLink.id)
+			if err := foundArtStrct.setCertifyGoodLinks(ctx, collectedCertifyGoodLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 		if sourceID != "" {
 			srcName.setCertifyGoodLinks(collectedCertifyGoodLink.id)
@@ -234,7 +238,7 @@ func (c *demoClient) CertifyGood(ctx context.Context, filter *model.CertifyGoodS
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactArtifact != nil {
-			search = append(search, exactArtifact.goodLinks...)
+			search = append(search, exactArtifact.GoodLinks...)
 			foundOne = true
 		}
 	}

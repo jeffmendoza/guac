@@ -99,7 +99,7 @@ func (c *demoClient) HasSlsa(ctx context.Context, filter *model.HasSLSASpec) ([]
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
 			if exactArtifact != nil {
-				search = append(search, exactArtifact.hasSLSAs...)
+				search = append(search, exactArtifact.HasSLSAs...)
 				foundOne = true
 				break
 			}
@@ -205,7 +205,7 @@ func (c *demoClient) ingestSLSA(ctx context.Context,
 	preds := convSLSAP(slsa.SlsaPredicate)
 
 	// Just picking the first builtFrom found to search the backedges
-	for _, slID := range bfs[0].hasSLSAs {
+	for _, slID := range bfs[0].HasSLSAs {
 		sl, err := byID[*hasSLSAStruct](slID, c)
 		if err != nil {
 			return nil, gqlerror.Errorf("IngestSLSA :: Internal db error, bad backedge")
@@ -246,9 +246,13 @@ func (c *demoClient) ingestSLSA(ctx context.Context,
 	}
 	c.index[sl.id] = sl
 	c.hasSLSAs = append(c.hasSLSAs, sl)
-	s.setHasSLSAs(sl.id)
+	if err := s.setHasSLSAs(ctx, sl.id, c); err != nil {
+		return nil, err
+	}
 	for _, a := range bfs {
-		a.setHasSLSAs(sl.id)
+		if err := a.setHasSLSAs(ctx, sl.id, c); err != nil {
+			return nil, err
+		}
 	}
 	b.setHasSLSAs(sl.id)
 

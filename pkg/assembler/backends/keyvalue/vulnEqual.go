@@ -35,7 +35,8 @@ type (
 	}
 )
 
-func (n *vulnerabilityEqualLink) ID() string { return n.id }
+func (n *vulnerabilityEqualLink) ID() string  { return n.id }
+func (n *vulnerabilityEqualLink) Key() string { return n.id }
 
 func (n *vulnerabilityEqualLink) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 2)

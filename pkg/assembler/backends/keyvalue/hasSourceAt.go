@@ -136,7 +136,9 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 		c.index[collectedSrcMapLink.id] = &collectedSrcMapLink
 		c.hasSources = append(c.hasSources, &collectedSrcMapLink)
 		// set the backlinks
-		pkgNameOrVersionNode.setSrcMapLinks(collectedSrcMapLink.id)
+		if err := pkgNameOrVersionNode.setSrcMapLinks(ctx, collectedSrcMapLink.id, c); err != nil {
+			return nil, err
+		}
 		srcName.setSrcMapLinks(collectedSrcMapLink.id)
 	}
 

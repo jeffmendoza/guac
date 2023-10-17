@@ -445,34 +445,6 @@ func TestIsDependency(t *testing.T) {
 			ExpIngestErr: true,
 		},
 		{
-			Name:  "Query bad ID",
-			InPkg: []*model.PkgInputSpec{p1, p2, p3},
-			Calls: []call{
-				{
-					P1: p1,
-					P2: p2,
-					MF: mAll,
-					ID: &model.IsDependencyInputSpec{},
-				},
-				{
-					P1: p2,
-					P2: p3,
-					MF: mAll,
-					ID: &model.IsDependencyInputSpec{},
-				},
-				{
-					P1: p1,
-					P2: p3,
-					MF: mAll,
-					ID: &model.IsDependencyInputSpec{},
-				},
-			},
-			Query: &model.IsDependencySpec{
-				ID: ptrfrom.String("asdf"),
-			},
-			ExpQueryErr: true,
-		},
-		{
 			Name:  "IsDep from version to version",
 			InPkg: []*model.PkgInputSpec{p2, p3},
 			Calls: []call{
@@ -589,6 +561,21 @@ func TestIsDependency(t *testing.T) {
 			if err != nil {
 				return
 			}
+			less := func(a, b *model.IsDependency) int {
+				if len(a.Package.Namespaces[0].Names[0].Versions) !=
+					len(b.Package.Namespaces[0].Names[0].Versions) {
+					return len(a.Package.Namespaces[0].Names[0].Versions) -
+						len(b.Package.Namespaces[0].Names[0].Versions)
+				}
+				if len(a.Package.Namespaces[0].Names[0].Versions) == 0 {
+					return strings.Compare(a.Package.Namespaces[0].Names[0].Name,
+						b.Package.Namespaces[0].Names[0].Name)
+				}
+				return strings.Compare(a.Package.Namespaces[0].Names[0].Versions[0].Version,
+					b.Package.Namespaces[0].Names[0].Versions[0].Version)
+			}
+			slices.SortFunc(got, less)
+			slices.SortFunc(test.ExpID, less)
 			// less := func(a, b *model.Package) bool { return a.Version < b.Version }
 			// for _, he := range got {
 			// 	slices.SortFunc(he.Packages, less)

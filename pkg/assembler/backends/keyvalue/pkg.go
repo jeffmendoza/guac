@@ -75,22 +75,24 @@ type pkgVersion struct {
 
 // Be type safe, don't use any / interface{}
 type pkgNameOrVersion interface {
-	implementsPkgNameOrVersion()
-	setSrcMapLinks(id string)
+	setSrcMapLinks(ctx context.Context, ID string, c *demoClient) error
 	getSrcMapLinks() []string
-	setIsDependencyLinks(id string)
+	setIsDependencyLinks(ctx context.Context, ID string, c *demoClient) error
 	getIsDependencyLinks() []string
-	setCertifyBadLinks(id string)
+	setCertifyBadLinks(ctx context.Context, ID string, c *demoClient) error
 	getCertifyBadLinks() []string
-	setCertifyGoodLinks(id string)
+	setCertifyGoodLinks(ctx context.Context, ID string, c *demoClient) error
 	getCertifyGoodLinks() []string
-	setHasMetadataLinks(id string)
+	setHasMetadataLinks(ctx context.Context, ID string, c *demoClient) error
 	getHasMetadataLinks() []string
-	setPointOfContactLinks(id string)
+	setPointOfContactLinks(ctx context.Context, ID string, c *demoClient) error
 	getPointOfContactLinks() []string
 
 	node
 }
+
+var _ pkgNameOrVersion = &pkgName{}
+var _ pkgNameOrVersion = &pkgVersion{}
 
 func (n *pkgType) ID() string      { return n.ThisID }
 func (n *pkgNamespace) ID() string { return n.ThisID }
@@ -195,77 +197,112 @@ func (n *pkgVersion) BuildModelNode(ctx context.Context, c *demoClient) (model.N
 	return c.buildPackageResponse(ctx, n.ThisID, nil)
 }
 
-func (p *pkgName) implementsPkgNameOrVersion()    {}
-func (p *pkgVersion) implementsPkgNameOrVersion() {}
-
 // hasSourceAt back edges
-func (p *pkgName) setSrcMapLinks(id string)    { p.SrcMapLinks = append(p.SrcMapLinks, id) }
-func (p *pkgVersion) setSrcMapLinks(id string) { p.SrcMapLinks = append(p.SrcMapLinks, id) }
+func (p *pkgName) setSrcMapLinks(ctx context.Context, id string, c *demoClient) error {
+	p.SrcMapLinks = append(p.SrcMapLinks, id)
+	return setkv(ctx, pkgNameCol, p, c)
+}
+func (p *pkgVersion) setSrcMapLinks(ctx context.Context, id string, c *demoClient) error {
+	p.SrcMapLinks = append(p.SrcMapLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
+}
 func (p *pkgName) getSrcMapLinks() []string    { return p.SrcMapLinks }
 func (p *pkgVersion) getSrcMapLinks() []string { return p.SrcMapLinks }
 
 // isDependency back edges
-func (p *pkgName) setIsDependencyLinks(id string) {
+func (p *pkgName) setIsDependencyLinks(ctx context.Context, id string, c *demoClient) error {
 	p.IsDependencyLinks = append(p.IsDependencyLinks, id)
+	return setkv(ctx, pkgNameCol, p, c)
 }
-func (p *pkgVersion) setIsDependencyLinks(id string) {
+func (p *pkgVersion) setIsDependencyLinks(ctx context.Context, id string, c *demoClient) error {
 	p.IsDependencyLinks = append(p.IsDependencyLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
 }
 func (p *pkgName) getIsDependencyLinks() []string    { return p.IsDependencyLinks }
 func (p *pkgVersion) getIsDependencyLinks() []string { return p.IsDependencyLinks }
 
 // isOccurrence back edges
-func (p *pkgVersion) setOccurrenceLinks(id string) { p.Occurrences = append(p.Occurrences, id) }
+func (p *pkgVersion) setOccurrenceLinks(ctx context.Context, id string, c *demoClient) error {
+	p.Occurrences = append(p.Occurrences, id)
+	return setkv(ctx, pkgVerCol, p, c)
+}
 
 // certifyVulnerability back edges
-func (p *pkgVersion) setVulnerabilityLinks(id string) {
+func (p *pkgVersion) setVulnerabilityLinks(ctx context.Context, id string, c *demoClient) error {
 	p.CertifyVulnLinks = append(p.CertifyVulnLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
 }
 
 // certifyVexStatement back edges
-func (p *pkgVersion) setVexLinks(id string) {
+func (p *pkgVersion) setVexLinks(ctx context.Context, id string, c *demoClient) error {
 	p.VexLinks = append(p.VexLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
 }
 
 // hasSBOM back edges
-func (p *pkgVersion) setHasSBOM(id string) { p.HasSBOMs = append(p.HasSBOMs, id) }
+func (p *pkgVersion) setHasSBOM(ctx context.Context, id string, c *demoClient) error {
+	p.HasSBOMs = append(p.HasSBOMs, id)
+	return setkv(ctx, pkgVerCol, p, c)
+}
 
 // certifyBad back edges
-func (p *pkgName) setCertifyBadLinks(id string)    { p.BadLinks = append(p.BadLinks, id) }
-func (p *pkgVersion) setCertifyBadLinks(id string) { p.BadLinks = append(p.BadLinks, id) }
+func (p *pkgName) setCertifyBadLinks(ctx context.Context, id string, c *demoClient) error {
+	p.BadLinks = append(p.BadLinks, id)
+	return setkv(ctx, pkgNameCol, p, c)
+}
+func (p *pkgVersion) setCertifyBadLinks(ctx context.Context, id string, c *demoClient) error {
+	p.BadLinks = append(p.BadLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
+}
 func (p *pkgName) getCertifyBadLinks() []string    { return p.BadLinks }
 func (p *pkgVersion) getCertifyBadLinks() []string { return p.BadLinks }
 
 // certifyGood back edges
-func (p *pkgName) setCertifyGoodLinks(id string)    { p.GoodLinks = append(p.GoodLinks, id) }
-func (p *pkgVersion) setCertifyGoodLinks(id string) { p.GoodLinks = append(p.GoodLinks, id) }
+func (p *pkgName) setCertifyGoodLinks(ctx context.Context, id string, c *demoClient) error {
+	p.GoodLinks = append(p.GoodLinks, id)
+	return setkv(ctx, pkgNameCol, p, c)
+}
+func (p *pkgVersion) setCertifyGoodLinks(ctx context.Context, id string, c *demoClient) error {
+	p.GoodLinks = append(p.GoodLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
+}
 func (p *pkgName) getCertifyGoodLinks() []string    { return p.GoodLinks }
 func (p *pkgVersion) getCertifyGoodLinks() []string { return p.GoodLinks }
 
 // hasMetadata back edges
-func (p *pkgName) setHasMetadataLinks(id string) {
+func (p *pkgName) setHasMetadataLinks(ctx context.Context, id string, c *demoClient) error {
 	p.HasMetadataLinks = append(p.HasMetadataLinks, id)
+	return setkv(ctx, pkgNameCol, p, c)
 }
-func (p *pkgVersion) setHasMetadataLinks(id string) {
+func (p *pkgVersion) setHasMetadataLinks(ctx context.Context, id string, c *demoClient) error {
 	p.HasMetadataLinks = append(p.HasMetadataLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
 }
 func (p *pkgName) getHasMetadataLinks() []string    { return p.HasMetadataLinks }
 func (p *pkgVersion) getHasMetadataLinks() []string { return p.HasMetadataLinks }
 
 // pointOfContact back edges
-func (p *pkgName) setPointOfContactLinks(id string) {
+func (p *pkgName) setPointOfContactLinks(ctx context.Context, id string, c *demoClient) error {
 	p.PointOfContactLinks = append(p.PointOfContactLinks, id)
+	return setkv(ctx, pkgNameCol, p, c)
 }
-func (p *pkgVersion) setPointOfContactLinks(id string) {
+func (p *pkgVersion) setPointOfContactLinks(ctx context.Context, id string, c *demoClient) error {
 	p.PointOfContactLinks = append(p.PointOfContactLinks, id)
+	return setkv(ctx, pkgVerCol, p, c)
 }
 func (p *pkgName) getPointOfContactLinks() []string    { return p.PointOfContactLinks }
 func (p *pkgVersion) getPointOfContactLinks() []string { return p.PointOfContactLinks }
 
 // pkgEqual back edges
-func (p *pkgVersion) setPkgEquals(id string) { p.PkgEquals = append(p.PkgEquals, id) }
+func (p *pkgVersion) setPkgEquals(ctx context.Context, id string, c *demoClient) error {
+	p.PkgEquals = append(p.PkgEquals, id)
+	return setkv(ctx, pkgVerCol, p, c)
+}
 
-func (p *pkgVersion) setCertifyLegals(id string) { p.CertifyLegals = append(p.CertifyLegals, id) }
+func (p *pkgVersion) setCertifyLegals(ctx context.Context, id string, c *demoClient) error {
+	p.CertifyLegals = append(p.CertifyLegals, id)
+	return setkv(ctx, pkgVerCol, p, c)
+}
 
 func (n *pkgType) Key() string {
 	return n.Type
@@ -652,7 +689,7 @@ func (c *demoClient) buildPackageResponse(ctx context.Context, id string, filter
 			Qualifiers: getCollectedPackageQualifiers(versionNode.Qualifiers),
 		})
 		currentID = versionNode.Parent
-	} else if !errors.Is(err, kv.KeyError) && !errors.Is(err, kv.CollectionError) { // type error
+	} else if !errors.Is(err, kv.NotFoundError) && !errors.Is(err, errTypeNotMatch) {
 		return nil, fmt.Errorf("Error retrieving node for id: %v : %w", currentID, err)
 	}
 
@@ -667,7 +704,7 @@ func (c *demoClient) buildPackageResponse(ctx context.Context, id string, filter
 			Versions: pvl,
 		})
 		currentID = nameNode.Parent
-	} else if !errors.Is(err, kv.KeyError) && !errors.Is(err, kv.CollectionError) { // type error
+	} else if !errors.Is(err, kv.NotFoundError) && !errors.Is(err, errTypeNotMatch) {
 		return nil, fmt.Errorf("Error retrieving node for id: %v : %w", currentID, err)
 	}
 
@@ -682,13 +719,13 @@ func (c *demoClient) buildPackageResponse(ctx context.Context, id string, filter
 			Names:     pnl,
 		})
 		currentID = namespaceNode.Parent
-	} else if !errors.Is(err, kv.KeyError) && !errors.Is(err, kv.CollectionError) { // type error
+	} else if !errors.Is(err, kv.NotFoundError) && !errors.Is(err, errTypeNotMatch) {
 		return nil, fmt.Errorf("Error retrieving node for id: %v : %w", currentID, err)
 	}
 
 	typeNode, err := byIDkv[*pkgType](ctx, currentID, c)
 	if err != nil {
-		if errors.Is(err, kv.KeyError) || errors.Is(err, kv.CollectionError) { // type error
+		if errors.Is(err, kv.NotFoundError) || errors.Is(err, errTypeNotMatch) {
 			return nil, fmt.Errorf("%w: ID does not match expected node type for package namespace", errNotFound)
 		} else {
 			return nil, fmt.Errorf("Error retrieving node for id: %v : %w", currentID, err)

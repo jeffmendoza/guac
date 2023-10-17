@@ -107,8 +107,8 @@ func (c *demoClient) ingestHashEqual(ctx context.Context, artifact model.Artifac
 	slices.Sort(artIDs)
 
 	// Search backedges for existing.
-	searchHEs := slices.Clone(aInt1.hashEquals)
-	searchHEs = append(searchHEs, aInt2.hashEquals...)
+	searchHEs := slices.Clone(aInt1.HashEquals)
+	searchHEs = append(searchHEs, aInt2.HashEquals...)
 
 	for _, he := range searchHEs {
 		h, err := byID[*hashEqualStruct](he, c)
@@ -140,8 +140,12 @@ func (c *demoClient) ingestHashEqual(ctx context.Context, artifact model.Artifac
 	}
 	c.index[he.id] = he
 	c.hashEquals = append(c.hashEquals, he)
-	aInt1.setHashEquals(he.id)
-	aInt2.setHashEquals(he.id)
+	if err := aInt1.setHashEquals(ctx, he.id, c); err != nil {
+		return nil, err
+	}
+	if err := aInt2.setHashEquals(ctx, he.id, c); err != nil {
+		return nil, err
+	}
 
 	return c.convHashEqual(ctx, he)
 }
@@ -220,7 +224,7 @@ func (c *demoClient) HashEqual(ctx context.Context, filter *model.HashEqualSpec)
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
 			if exactArtifact != nil {
-				search = append(search, exactArtifact.hashEquals...)
+				search = append(search, exactArtifact.HashEquals...)
 				foundOne = true
 				break
 			}

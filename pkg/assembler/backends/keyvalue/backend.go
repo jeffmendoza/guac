@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -69,6 +70,7 @@ type node interface {
 type indexType map[string]node
 
 var errNotFound = errors.New("not found")
+var errTypeNotMatch = errors.New("Stored type does not match")
 
 // Scorecard scores are in range of 1-10, so a single step at 100 should be
 // plenty big
@@ -83,7 +85,35 @@ const (
 	pkgNSCol   = "pkgNamespaces"
 	pkgNameCol = "pkgNames"
 	pkgVerCol  = "pkgVersions"
+	isDepCol   = "isDependencies"
+	hasMDCol   = "hasMetadatas"
+	hasSBOMCol = "hasSBOMs"
 )
+
+func typeColMap(col string) node {
+	switch col {
+	case artCol:
+		return &artStruct{}
+	case occCol:
+		return &isOccurrenceStruct{}
+	case pkgTypeCol:
+		return &pkgType{}
+	case pkgNSCol:
+		return &pkgNamespace{}
+	case pkgNameCol:
+		return &pkgName{}
+	case pkgVerCol:
+		return &pkgVersion{}
+	case isDepCol:
+		return &isDependencyLink{}
+	case hasMDCol:
+		return &hasMetadataLink{}
+	case hasSBOMCol:
+		return &hasSBOMStruct{}
+	}
+	//?
+	return &artStruct{}
+}
 
 // atomic add to ensure ID is not duplicated
 func (c *demoClient) getNextID() string {
@@ -109,12 +139,9 @@ type demoClient struct {
 	certifyGoods           goodList
 	certifyLegals          certifyLegalList
 	certifyVulnerabilities certifyVulnerabilityList
-	hasMetadatas           hasMetadataList
-	hasSBOMs               hasSBOMList
 	hasSLSAs               hasSLSAList
 	hasSources             hasSrcList
 	hashEquals             hashEqualList
-	isDependencies         isDependencyList
 	pkgEquals              pkgEqualList
 	pointOfContacts        pointOfContactList
 	scorecards             scorecardList
@@ -191,6 +218,7 @@ func floatEqual(x float64, y float64) bool {
 	return math.Abs(x-y) < epsilon
 }
 
+// delete this
 func byID[E node](id string, c *demoClient) (E, error) {
 	var nl E
 	o, ok := c.index[id]
@@ -208,23 +236,28 @@ func byIDkv[E node](ctx context.Context, id string, c *demoClient) (E, error) {
 	var nl E
 	k, err := c.kv.Get(ctx, indexCol, id)
 	if err != nil {
-		return nl, err
+		return nl, fmt.Errorf("%w : id not found in index %q", err, id)
 	}
 	sub := strings.SplitN(k, ":", 2)
 	if len(sub) != 2 {
 		return nl, fmt.Errorf("Bad value was stored in index map: %v", k)
 	}
-	// FIXME make a table and check that collection(sub[0]) is correct for typeof E
-	return byKeykv[E](ctx, sub[1], sub[0], c)
+	if err := validateType(nl, sub[0]); err != nil {
+		return nl, err
+	}
+	return byKeykv[E](ctx, sub[0], sub[1], c)
 }
 
-func byKeykv[E node](ctx context.Context, k string, coll string, c *demoClient) (E, error) {
+func byKeykv[E node](ctx context.Context, coll string, k string, c *demoClient) (E, error) {
 	var nl E
+	// if err := validateType(nl, coll); err != nil {
+	// 	return nl, err
+	// }
 	strval, err := c.kv.Get(ctx, coll, k)
 	if err != nil {
 		return nl, err
 	}
-	if err = json.Unmarshal([]byte(strval), &nl); err != nil {
+	if err := json.Unmarshal([]byte(strval), &nl); err != nil {
 		return nl, err
 	}
 	return nl, nil
@@ -239,8 +272,19 @@ func setkv[E node](ctx context.Context, coll string, n E, c *demoClient) error {
 }
 
 func (c *demoClient) addToIndex(ctx context.Context, coll string, n node) error {
+	// if err := validateType(n, coll); err != nil {
+	// 	return err
+	// }
 	val := strings.Join([]string{coll, n.Key()}, ":")
 	return c.kv.Set(ctx, indexCol, n.ID(), val)
+}
+
+func validateType[E node](n E, c string) error {
+	if reflect.TypeOf(typeColMap(c)) == reflect.TypeOf(n) {
+		return nil
+	}
+	return fmt.Errorf("%w : found: %q want: %q", errTypeNotMatch,
+		reflect.TypeOf(typeColMap(c)), reflect.TypeOf(n))
 }
 
 func lock(m *sync.RWMutex, readOnly bool) {

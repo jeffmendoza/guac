@@ -39,7 +39,8 @@ type pointOfContactLink struct {
 	collector     string
 }
 
-func (n *pointOfContactLink) ID() string { return n.id }
+func (n *pointOfContactLink) ID() string  { return n.id }
+func (n *pointOfContactLink) Key() string { return n.id }
 
 func (n *pointOfContactLink) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 1)
@@ -101,35 +102,25 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 	lock(&c.m, readOnly)
 	defer unlock(&c.m, readOnly)
 
-	var packageID string
 	var foundPkgNameorVersionNode pkgNameOrVersion
-	var artifactID string
 	var foundArtStrct *artStruct
 	var sourceID string
 	var srcName *srcNameNode
 	searchIDs := []string{}
 	if subject.Package != nil {
 		var err error
-		packageID, err = getPackageIDFromInput(c, *subject.Package, *pkgMatchType)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		foundPkgNameorVersionNode, err = byID[pkgNameOrVersion](packageID, c)
+		foundPkgNameorVersionNode, err = c.getPackageNameOrVerFromInput(ctx, *subject.Package, *pkgMatchType)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
 		searchIDs = append(searchIDs, foundPkgNameorVersionNode.getPointOfContactLinks()...)
 	} else if subject.Artifact != nil {
 		var err error
-		artifactID, err = c.artifactIDByInput(ctx, subject.Artifact)
+		foundArtStrct, err := c.artifactByInput(ctx, subject.Artifact)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		foundArtStrct, err = byID[*artStruct](artifactID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		searchIDs = append(searchIDs, foundArtStrct.pointOfContactLinks...)
+		searchIDs = append(searchIDs, foundArtStrct.PointOfContactLinks...)
 	} else {
 		var err error
 		sourceID, err = getSourceIDFromInput(c, *subject.Source)
@@ -152,10 +143,10 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
 		subjectMatch := false
-		if packageID != "" && packageID == v.packageID {
+		if foundPkgNameorVersionNode != nil && foundPkgNameorVersionNode.ID() == v.packageID {
 			subjectMatch = true
 		}
-		if artifactID != "" && artifactID == v.artifactID {
+		if foundArtStrct != nil && foundArtStrct.ThisID == v.artifactID {
 			subjectMatch = true
 		}
 		if sourceID != "" && sourceID == v.sourceID {
@@ -180,9 +171,9 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 		}
 		// store the link
 		collectedLink = pointOfContactLink{
-			id:            c.getNextID(),
-			packageID:     packageID,
-			artifactID:    artifactID,
+			id: c.getNextID(),
+			// packageID:     packageID, FIXME
+			// artifactID:    artifactID,
 			sourceID:      sourceID,
 			email:         pointOfContact.Email,
 			info:          pointOfContact.Info,
@@ -194,12 +185,12 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 		c.index[collectedLink.id] = &collectedLink
 		c.pointOfContacts = append(c.pointOfContacts, &collectedLink)
 		// set the backlinks
-		if packageID != "" {
-			foundPkgNameorVersionNode.setPointOfContactLinks(collectedLink.id)
-		}
-		if artifactID != "" {
-			foundArtStrct.setPointOfContactLinks(collectedLink.id)
-		}
+		// if packageID != "" { FIXME
+		// 	foundPkgNameorVersionNode.setPointOfContactLinks(collectedLink.id)
+		// }
+		// if artifactID != "" {
+		// 	foundArtStrct.setPointOfContactLinks(collectedLink.id)
+		// }
 		if sourceID != "" {
 			srcName.setPointOfContactLinks(collectedLink.id)
 		}
@@ -244,7 +235,7 @@ func (c *demoClient) PointOfContact(ctx context.Context, filter *model.PointOfCo
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactArtifact != nil {
-			search = append(search, exactArtifact.pointOfContactLinks...)
+			search = append(search, exactArtifact.PointOfContactLinks...)
 			foundOne = true
 		}
 	}
@@ -323,7 +314,7 @@ func (c *demoClient) buildPointOfContact(ctx context.Context, link *pointOfConta
 	var err error
 	if filter != nil && filter.Subject != nil {
 		if filter.Subject.Package != nil && link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, filter.Subject.Package)
+			p, err = c.buildPackageResponse(ctx, link.packageID, filter.Subject.Package)
 			if err != nil {
 				return nil, err
 			}
@@ -342,7 +333,7 @@ func (c *demoClient) buildPointOfContact(ctx context.Context, link *pointOfConta
 		}
 	} else {
 		if link.packageID != "" {
-			p, err = c.buildPackageResponse(link.packageID, nil)
+			p, err = c.buildPackageResponse(ctx, link.packageID, nil)
 			if err != nil {
 				return nil, err
 			}

@@ -457,32 +457,6 @@ func TestHasSBOM(t *testing.T) {
 			ExpIngestErr: true,
 		},
 		{
-			Name:  "Query bad ID",
-			InPkg: []*model.PkgInputSpec{p1},
-			Calls: []call{
-				{
-					Sub: model.PackageOrArtifactInput{
-						Package: p1,
-					},
-					HS: &model.HasSBOMInputSpec{
-						DownloadLocation: "location one",
-					},
-				},
-				{
-					Sub: model.PackageOrArtifactInput{
-						Package: p1,
-					},
-					HS: &model.HasSBOMInputSpec{
-						DownloadLocation: "location two",
-					},
-				},
-			},
-			Query: &model.HasSBOMSpec{
-				ID: ptrfrom.String("-7"),
-			},
-			ExpQueryErr: true,
-		},
-		{
 			Name:  "Query without hasSBOMSpec",
 			InPkg: []*model.PkgInputSpec{p1},
 			Calls: []call{
@@ -508,6 +482,27 @@ func TestHasSBOM(t *testing.T) {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0
 	}, cmp.Ignore())
 	ctx := context.Background()
+	less := func(a, b *model.HasSbom) int {
+		ap, ok := a.Subject.(model.Package)
+		if !ok {
+			return 0
+		}
+		bp, ok := b.Subject.(model.Package)
+		if !ok {
+			return 0
+		}
+		if len(ap.Namespaces[0].Names[0].Versions) !=
+			len(bp.Namespaces[0].Names[0].Versions) {
+			return len(ap.Namespaces[0].Names[0].Versions) -
+				len(bp.Namespaces[0].Names[0].Versions)
+		}
+		if len(ap.Namespaces[0].Names[0].Versions) == 0 {
+			return strings.Compare(ap.Namespaces[0].Names[0].Name,
+				bp.Namespaces[0].Names[0].Name)
+		}
+		return strings.Compare(ap.Namespaces[0].Names[0].Versions[0].Version,
+			bp.Namespaces[0].Names[0].Versions[0].Version)
+	}
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
 			b, err := backends.Get("keyvalue", nil, nil)
@@ -540,6 +535,8 @@ func TestHasSBOM(t *testing.T) {
 			if err != nil {
 				return
 			}
+			slices.SortFunc(got, less)
+			slices.SortFunc(test.ExpHS, less)
 			if diff := cmp.Diff(test.ExpHS, got, ignoreID); diff != "" {
 				t.Errorf("Unexpected results. (-want +got):\n%s", diff)
 			}

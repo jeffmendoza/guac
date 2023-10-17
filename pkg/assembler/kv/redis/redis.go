@@ -48,9 +48,10 @@ func (s *Store) Get(ctx context.Context, c, k string) (string, error) {
 		return "", err
 	}
 	v, err := s.c.HGet(ctx, c, k).Result()
-	// if err != nil {
-	// 	fmt.Printf("Error from redis: %v\n", err)
-	// }
+.	// FIXME, should figure out error
+	if v == "" {
+		return "", kv.NotFoundError
+	}
 	return v, err
 }
 
