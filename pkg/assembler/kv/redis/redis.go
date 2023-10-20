@@ -18,53 +18,51 @@ package redis
 import (
 	"context"
 
-	"github.com/guacsec/guac/pkg/assembler/kv"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/guacsec/guac/pkg/assembler/kv"
 )
+
+var json = jsoniter.ConfigFastest
 
 type Store struct {
 	c *redis.Client
 }
 
-// check interface compatability
-var _ kv.Store = &Store{}
-
-func (s *Store) init() error {
-	if s.c == nil {
-		//opt, err := redis.ParseURL("redis://<user>:<pass>@localhost:6379/<db>")
-		//opt, err := redis.ParseURL("redis://user@localhost:6379/0")
-		opt, err := redis.ParseURL("redis://user@localhost:2379/0")
-		if err != nil {
-			return err
-		}
-
-		s.c = redis.NewClient(opt)
+func GetStore() (kv.Store, error) {
+	//opt, err := redis.ParseURL("redis://<user>:<pass>@localhost:6379/<db>")
+	//opt, err := redis.ParseURL("redis://user@localhost:6379/0")
+	opt, err := redis.ParseURL("redis://user@localhost:2379/0")
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	return &Store{
+		c: redis.NewClient(opt),
+	}, nil
 }
 
-func (s *Store) Get(ctx context.Context, c, k string) (string, error) {
-	if err := s.init(); err != nil {
-		return "", err
+func (s *Store) Get(ctx context.Context, c, k string, v any) error {
+	j, err := s.c.HGet(ctx, c, k).Result()
+	// FIXME, should figure out error
+	if j == "" {
+		return kv.NotFoundError
 	}
-	v, err := s.c.HGet(ctx, c, k).Result()
-.	// FIXME, should figure out error
-	if v == "" {
-		return "", kv.NotFoundError
-	}
-	return v, err
-}
-
-func (s *Store) Set(ctx context.Context, c, k, v string) error {
-	if err := s.init(); err != nil {
+	if err != nil {
 		return err
 	}
-	return s.c.HSet(ctx, c, k, v).Err()
+	return json.Unmarshal([]byte(j), v)
+}
+
+func (s *Store) Set(ctx context.Context, c, k string, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return s.c.HSet(ctx, c, k, string(b)).Err()
 }
 
 func (s *Store) Keys(ctx context.Context, c string) ([]string, error) {
-	if err := s.init(); err != nil {
-		return nil, err
-	}
 	return s.c.HKeys(ctx, c).Result()
 }

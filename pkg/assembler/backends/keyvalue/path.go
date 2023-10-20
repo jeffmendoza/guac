@@ -17,7 +17,6 @@ package keyvalue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -80,24 +79,21 @@ func (c *demoClient) Neighbors(ctx context.Context, source string, usingOnly []m
 // }
 
 func (c *demoClient) neighborsFromId(ctx context.Context, id string, allowedEdges edgeMap) ([]string, error) {
-	k, err := c.kv.Get(ctx, indexCol, id)
-	if err != nil {
+	var k string
+	if err := c.kv.Get(ctx, indexCol, id, &k); err != nil {
 		return nil, fmt.Errorf("%w : id not found in index %q", err, id)
 	}
+
 	sub := strings.SplitN(k, ":", 2)
 	if len(sub) != 2 {
 		return nil, fmt.Errorf("Bad value was stored in index map: %v", k)
 	}
 
 	node := typeColMap(sub[0])
+	if err := c.kv.Get(ctx, sub[0], sub[1], &node); err != nil {
+		return nil, err
+	}
 
-	strval, err := c.kv.Get(ctx, sub[0], sub[1])
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal([]byte(strval), &node); err != nil {
-		return nil, err
-	}
 	return node.Neighbors(allowedEdges), nil
 }
 
@@ -176,22 +172,18 @@ func (c *demoClient) Node(ctx context.Context, id string) (model.Node, error) {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	k, err := c.kv.Get(ctx, indexCol, id)
-	if err != nil {
+	var k string
+	if err := c.kv.Get(ctx, indexCol, id, &k); err != nil {
 		return nil, fmt.Errorf("%w : id not found in index %q", err, id)
 	}
+
 	sub := strings.SplitN(k, ":", 2)
 	if len(sub) != 2 {
 		return nil, fmt.Errorf("Bad value was stored in index map: %v", k)
 	}
 
 	node := typeColMap(sub[0])
-
-	strval, err := c.kv.Get(ctx, sub[0], sub[1])
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal([]byte(strval), &node); err != nil {
+	if err := c.kv.Get(ctx, sub[0], sub[1], &node); err != nil {
 		return nil, err
 	}
 

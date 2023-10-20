@@ -17,38 +17,40 @@ package memmap
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/guacsec/guac/pkg/assembler/kv"
 	"golang.org/x/exp/maps"
 )
 
 type Store struct {
-	m map[string]map[string]string
+	m map[string]map[string]any
 }
 
 func GetStore() kv.Store {
 	return &Store{
-		m: make(map[string]map[string]string),
+		m: make(map[string]map[string]any),
 	}
 }
 
-func (s *Store) Get(_ context.Context, c, k string) (string, error) {
+func (s *Store) Get(_ context.Context, c, k string, v any) error {
 	col, ok := s.m[c]
 	if !ok {
-		return "", fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
+		return fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
 	}
-
 	val, ok := col[k]
 	if !ok {
-		return "", fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
+		return fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
 	}
-	return val, nil
+
+	return copyAny(val, v)
 }
 
-func (s *Store) Set(_ context.Context, c, k, v string) error {
+func (s *Store) Set(_ context.Context, c, k string, v any) error {
 	if s.m[c] == nil {
-		s.m[c] = make(map[string]string)
+		s.m[c] = make(map[string]any)
 	}
 	s.m[c][k] = v
 	return nil
@@ -59,4 +61,24 @@ func (s *Store) Keys(_ context.Context, c string) ([]string, error) {
 		return nil, nil
 	}
 	return maps.Keys(s.m[c]), nil
+}
+
+func copyAny(src any, dst any) error {
+	dP := reflect.ValueOf(dst)
+	if dP.Kind() != reflect.Pointer {
+		return errors.New("Destination not pointer")
+	}
+	d := dP.Elem()
+	if !d.CanSet() {
+		return errors.New("Destination not settable")
+	}
+	s := reflect.ValueOf(src)
+	// if s.Kind() == reflect.Pointer {
+	// 	s = s.Elem()
+	// }
+	if s.Type() != d.Type() {
+		return fmt.Errorf("Source and Destination not same type: %v, %v", s.Type(), d.Type())
+	}
+	d.Set(s)
+	return nil
 }

@@ -17,7 +17,6 @@ package keyvalue
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -234,8 +233,8 @@ func byID[E node](id string, c *demoClient) (E, error) {
 
 func byIDkv[E node](ctx context.Context, id string, c *demoClient) (E, error) {
 	var nl E
-	k, err := c.kv.Get(ctx, indexCol, id)
-	if err != nil {
+	var k string
+	if err := c.kv.Get(ctx, indexCol, id, &k); err != nil {
 		return nl, fmt.Errorf("%w : id not found in index %q", err, id)
 	}
 	sub := strings.SplitN(k, ":", 2)
@@ -253,22 +252,12 @@ func byKeykv[E node](ctx context.Context, coll string, k string, c *demoClient) 
 	// if err := validateType(nl, coll); err != nil {
 	// 	return nl, err
 	// }
-	strval, err := c.kv.Get(ctx, coll, k)
-	if err != nil {
-		return nl, err
-	}
-	if err := json.Unmarshal([]byte(strval), &nl); err != nil {
-		return nl, err
-	}
-	return nl, nil
+	err := c.kv.Get(ctx, coll, k, &nl)
+	return nl, err
 }
 
-func setkv[E node](ctx context.Context, coll string, n E, c *demoClient) error {
-	byteval, err := json.Marshal(n)
-	if err != nil {
-		return err
-	}
-	return c.kv.Set(ctx, coll, n.Key(), string(byteval))
+func setkv(ctx context.Context, coll string, n node, c *demoClient) error {
+	return c.kv.Set(ctx, coll, n.Key(), n)
 }
 
 func (c *demoClient) addToIndex(ctx context.Context, coll string, n node) error {

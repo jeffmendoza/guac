@@ -24,11 +24,12 @@ import (
 // Store is an interface to define to serve as a keyvalue store
 type Store interface {
 
-	// Retrieve value from store, if not found resurns NotFoundError
-	Get(ctx context.Context, collection, key string) (string, error)
+	// Retrieve value from store, if not found resurns NotFoundError, ptr must be
+	// a pointer to the value stored.
+	Get(ctx context.Context, collection, key string, ptr any) error
 
 	// Creates a value, also collection if necessary
-	Set(ctx context.Context, collection, key, value string) error
+	Set(ctx context.Context, collection, key string, value any) error
 
 	// Returns a slice of all keys for a collection. If collection does not
 	// exist, return a nil slice.
