@@ -59,25 +59,6 @@ func (c *demoClient) Neighbors(ctx context.Context, source string, usingOnly []m
 	return c.Nodes(ctx, neighbors)
 }
 
-// func (c *demoClient) buildModelNodes(ctx context.Context, nodeIDs []string) ([]model.Node, error) {
-// 	out := make([]model.Node, len(nodeIDs))
-
-// 	for i, nodeID := range nodeIDs {
-// 		node, ok := c.index[nodeID]
-// 		if !ok {
-// 			return nil, gqlerror.Errorf("Internal data error: got invalid node id %q", nodeID)
-// 		}
-// 		var err error
-
-// 		out[i], err = node.BuildModelNode(ctx, c)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-
-// 	return out, nil
-// }
-
 func (c *demoClient) neighborsFromId(ctx context.Context, id string, allowedEdges edgeMap) ([]string, error) {
 	var k string
 	if err := c.kv.Get(ctx, indexCol, id, &k); err != nil {

@@ -104,7 +104,6 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 
 	var foundPkgNameorVersionNode pkgNameOrVersion
 	var foundArtStrct *artStruct
-	var sourceID string
 	var srcName *srcNameNode
 	searchIDs := []string{}
 	if subject.Package != nil {
@@ -123,15 +122,11 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 		searchIDs = append(searchIDs, foundArtStrct.PointOfContactLinks...)
 	} else {
 		var err error
-		sourceID, err = getSourceIDFromInput(c, *subject.Source)
+		srcName, err = c.getSourceNameFromInput(ctx, *subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		srcName, err = byID[*srcNameNode](sourceID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		searchIDs = append(searchIDs, srcName.pointOfContactLinks...)
+		searchIDs = append(searchIDs, srcName.PointOfContactLinks...)
 	}
 
 	// Don't insert duplicates
@@ -149,7 +144,7 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 		if foundArtStrct != nil && foundArtStrct.ThisID == v.artifactID {
 			subjectMatch = true
 		}
-		if sourceID != "" && sourceID == v.sourceID {
+		if srcName != nil && srcName.ThisID == v.sourceID {
 			subjectMatch = true
 		}
 		if subjectMatch && pointOfContact.Justification == v.justification &&
@@ -174,7 +169,7 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 			id: c.getNextID(),
 			// packageID:     packageID, FIXME
 			// artifactID:    artifactID,
-			sourceID:      sourceID,
+			// fixme sourceID:      ,
 			email:         pointOfContact.Email,
 			info:          pointOfContact.Info,
 			since:         pointOfContact.Since,
@@ -191,8 +186,10 @@ func (c *demoClient) ingestPointOfContact(ctx context.Context, subject model.Pac
 		// if artifactID != "" {
 		// 	foundArtStrct.setPointOfContactLinks(collectedLink.id)
 		// }
-		if sourceID != "" {
-			srcName.setPointOfContactLinks(collectedLink.id)
+		if srcName != nil {
+			if err := srcName.setPointOfContactLinks(ctx, collectedLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 
 	}
@@ -240,12 +237,12 @@ func (c *demoClient) PointOfContact(ctx context.Context, filter *model.PointOfCo
 		}
 	}
 	if !foundOne && filter != nil && filter.Subject != nil && filter.Subject.Source != nil {
-		exactSource, err := c.exactSource(filter.Subject.Source)
+		exactSource, err := c.exactSource(ctx, filter.Subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactSource != nil {
-			search = append(search, exactSource.pointOfContactLinks...)
+			search = append(search, exactSource.PointOfContactLinks...)
 			foundOne = true
 		}
 	}
@@ -326,7 +323,7 @@ func (c *demoClient) buildPointOfContact(ctx context.Context, link *pointOfConta
 			}
 		}
 		if filter.Subject.Source != nil && link.sourceID != "" {
-			s, err = c.buildSourceResponse(link.sourceID, filter.Subject.Source)
+			s, err = c.buildSourceResponse(ctx, link.sourceID, filter.Subject.Source)
 			if err != nil {
 				return nil, err
 			}
@@ -345,7 +342,7 @@ func (c *demoClient) buildPointOfContact(ctx context.Context, link *pointOfConta
 			}
 		}
 		if link.sourceID != "" {
-			s, err = c.buildSourceResponse(link.sourceID, nil)
+			s, err = c.buildSourceResponse(ctx, link.sourceID, nil)
 			if err != nil {
 				return nil, err
 			}

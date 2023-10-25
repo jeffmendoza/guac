@@ -24,11 +24,11 @@ import (
 // Store is an interface to define to serve as a keyvalue store
 type Store interface {
 
-	// Retrieve value from store, if not found resurns NotFoundError, ptr must be
-	// a pointer to the value stored.
+	// Retrieve value from store. If not found, returns NotFoundError. Ptr must
+	// be a pointer to the type of value stored.
 	Get(ctx context.Context, collection, key string, ptr any) error
 
-	// Creates a value, also collection if necessary
+	// Sets a value, creates collection if necessary
 	Set(ctx context.Context, collection, key string, value any) error
 
 	// Returns a slice of all keys for a collection. If collection does not
@@ -37,4 +37,8 @@ type Store interface {
 }
 
 // Error to return (wrap) on Get if value not found
-var NotFoundError = errors.New("Not Found")
+var NotFoundError = errors.New("Not found")
+
+// Error to return (wrap) on Get if Ptr is not a pointer, or not the right
+// type.
+var BadPtrError = errors.New("Bad pointer")

@@ -87,6 +87,11 @@ const (
 	isDepCol   = "isDependencies"
 	hasMDCol   = "hasMetadatas"
 	hasSBOMCol = "hasSBOMs"
+	srcTypeCol = "srcTypes"
+	srcNSCol   = "srcNamespaces"
+	srcNameCol = "srcNames"
+	cgCol      = "certifyGoods"
+	cbCol      = "certifyBads"
 )
 
 func typeColMap(col string) node {
@@ -109,6 +114,16 @@ func typeColMap(col string) node {
 		return &hasMetadataLink{}
 	case hasSBOMCol:
 		return &hasSBOMStruct{}
+	case srcTypeCol:
+		return &srcType{}
+	case srcNSCol:
+		return &srcNamespace{}
+	case srcNameCol:
+		return &srcNameNode{}
+	case cgCol:
+		return &goodLink{}
+	case cbCol:
+		return &badLink{}
 	}
 	//?
 	return &artStruct{}
@@ -131,11 +146,8 @@ type demoClient struct {
 
 	builders        builderMap
 	licenses        licMap
-	sources         srcTypeMap
 	vulnerabilities vulnTypeMap
 
-	certifyBads            badList
-	certifyGoods           goodList
 	certifyLegals          certifyLegalList
 	certifyVulnerabilities certifyVulnerabilityList
 	hasSLSAs               hasSLSAList
@@ -162,7 +174,6 @@ func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, 
 		builders:        builderMap{},
 		index:           indexType{},
 		licenses:        licMap{},
-		sources:         srcTypeMap{},
 		vulnerabilities: vulnTypeMap{},
 	}, nil
 }
@@ -241,17 +252,14 @@ func byIDkv[E node](ctx context.Context, id string, c *demoClient) (E, error) {
 	if len(sub) != 2 {
 		return nl, fmt.Errorf("Bad value was stored in index map: %v", k)
 	}
-	if err := validateType(nl, sub[0]); err != nil {
-		return nl, err
-	}
 	return byKeykv[E](ctx, sub[0], sub[1], c)
 }
 
 func byKeykv[E node](ctx context.Context, coll string, k string, c *demoClient) (E, error) {
 	var nl E
-	// if err := validateType(nl, coll); err != nil {
-	// 	return nl, err
-	// }
+	if err := validateType(nl, coll); err != nil {
+		return nl, err
+	}
 	err := c.kv.Get(ctx, coll, k, &nl)
 	return nl, err
 }
@@ -261,9 +269,9 @@ func setkv(ctx context.Context, coll string, n node, c *demoClient) error {
 }
 
 func (c *demoClient) addToIndex(ctx context.Context, coll string, n node) error {
-	// if err := validateType(n, coll); err != nil {
-	// 	return err
-	// }
+	if err := validateType(n, coll); err != nil {
+		return err
+	}
 	val := strings.Join([]string{coll, n.Key()}, ":")
 	return c.kv.Set(ctx, indexCol, n.ID(), val)
 }
@@ -290,4 +298,8 @@ func unlock(m *sync.RWMutex, readOnly bool) {
 	} else {
 		m.Unlock()
 	}
+}
+
+func timeKey(t time.Time) string {
+	return fmt.Sprint(t.Unix())
 }

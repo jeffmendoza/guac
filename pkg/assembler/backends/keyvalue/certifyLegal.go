@@ -135,16 +135,12 @@ func (c *demoClient) ingestCertifyLegal(ctx context.Context, subject model.Packa
 	var sourceID string
 	var src *srcNameNode
 	if subject.Source != nil {
-		sid, err := getSourceIDFromInput(c, *subject.Source)
+		src, err := c.getSourceNameFromInput(ctx, *subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
-		sourceID = sid
-		src, err = byID[*srcNameNode](sourceID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		backedgeSearch = src.certifyLegals
+		sourceID = src.ThisID
+		backedgeSearch = src.CertifyLegals
 	}
 
 	for _, id := range backedgeSearch {
@@ -192,7 +188,9 @@ func (c *demoClient) ingestCertifyLegal(ctx context.Context, subject model.Packa
 			return nil, err
 		}
 	} else {
-		src.setCertifyLegals(cl.id)
+		if err := src.setCertifyLegals(ctx, cl.id, c); err != nil {
+			return nil, err
+		}
 	}
 	for _, lid := range dec {
 		l, err := byID[*licStruct](lid, c)
@@ -245,7 +243,7 @@ func (c *demoClient) convLegal(ctx context.Context, in *certifyLegalStruct) (*mo
 		}
 		cl.Subject = p
 	} else {
-		s, err := c.buildSourceResponse(in.source, nil)
+		s, err := c.buildSourceResponse(ctx, in.source, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -287,12 +285,12 @@ func (c *demoClient) CertifyLegal(ctx context.Context, filter *model.CertifyLega
 		}
 	}
 	if !foundOne && filter != nil && filter.Subject != nil && filter.Subject.Source != nil {
-		exactSource, err := c.exactSource(filter.Subject.Source)
+		exactSource, err := c.exactSource(ctx, filter.Subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactSource != nil {
-			search = append(search, exactSource.certifyLegals...)
+			search = append(search, exactSource.CertifyLegals...)
 			foundOne = true
 		}
 	}
@@ -378,7 +376,7 @@ func (c *demoClient) addLegalIfMatch(ctx context.Context, out []*model.CertifyLe
 			if link.source == "" {
 				return out, nil
 			}
-			s, err := c.buildSourceResponse(link.source, filter.Subject.Source)
+			s, err := c.buildSourceResponse(ctx, link.source, filter.Subject.Source)
 			if err != nil {
 				return nil, err
 			}

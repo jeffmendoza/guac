@@ -208,9 +208,7 @@ var s1out = &model.Source{
 	Namespaces: []*model.SourceNamespace{{
 		Namespace: "github.com/jeff",
 		Names: []*model.SourceName{{
-			Name:   "myrepo",
-			Tag:    ptrfrom.String(""),
-			Commit: ptrfrom.String(""),
+			Name: "myrepo",
 		}},
 	}},
 }
@@ -226,9 +224,7 @@ var s2out = &model.Source{
 	Namespaces: []*model.SourceNamespace{{
 		Namespace: "github.com/bob",
 		Names: []*model.SourceName{{
-			Name:   "bobsrepo",
-			Tag:    ptrfrom.String(""),
-			Commit: ptrfrom.String(""),
+			Name: "bobsrepo",
 		}},
 	}},
 }

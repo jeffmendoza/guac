@@ -78,15 +78,11 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 	lock(&c.m, readOnly)
 	defer unlock(&c.m, readOnly)
 
-	sourceID, err := getSourceIDFromInput(c, source)
+	srcName, err := c.getSourceNameFromInput(ctx, source)
 	if err != nil {
 		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 	}
-	srcName, err := byID[*srcNameNode](sourceID, c)
-	if err != nil {
-		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-	}
-	sourceHasSourceLinks := srcName.srcMapLinks
+	sourceHasSourceLinks := srcName.SrcMapLinks
 
 	pkgNameOrVersionNode, err := c.getPackageNameOrVerFromInput(ctx, packageArg, pkgMatchType)
 	if err != nil {
@@ -109,7 +105,7 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		if pkgNameOrVersionNode.ID() == v.packageID && sourceID == v.sourceID && hasSourceAt.Justification == v.justification &&
+		if pkgNameOrVersionNode.ID() == v.packageID && srcName.ThisID == v.sourceID && hasSourceAt.Justification == v.justification &&
 			hasSourceAt.Origin == v.origin && hasSourceAt.Collector == v.collector && hasSourceAt.KnownSince.Equal(v.knownSince) {
 			collectedSrcMapLink = *v
 			duplicate = true
@@ -126,7 +122,7 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 		// store the link
 		collectedSrcMapLink = srcMapLink{
 			id:            c.getNextID(),
-			sourceID:      sourceID,
+			sourceID:      srcName.ThisID,
 			packageID:     pkgNameOrVersionNode.ID(),
 			knownSince:    hasSourceAt.KnownSince.UTC(),
 			justification: hasSourceAt.Justification,
@@ -139,7 +135,9 @@ func (c *demoClient) ingestHasSourceAt(ctx context.Context, packageArg model.Pkg
 		if err := pkgNameOrVersionNode.setSrcMapLinks(ctx, collectedSrcMapLink.id, c); err != nil {
 			return nil, err
 		}
-		srcName.setSrcMapLinks(collectedSrcMapLink.id)
+		if err := srcName.setSrcMapLinks(ctx, collectedSrcMapLink.id, c); err != nil {
+			return nil, err
+		}
 	}
 
 	// build return GraphQL type
@@ -173,12 +171,12 @@ func (c *demoClient) HasSourceAt(ctx context.Context, filter *model.HasSourceAtS
 	var search []string
 	foundOne := false
 	if filter != nil && filter.Source != nil {
-		exactSource, err := c.exactSource(filter.Source)
+		exactSource, err := c.exactSource(ctx, filter.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactSource != nil {
-			search = append(search, exactSource.srcMapLinks...)
+			search = append(search, exactSource.SrcMapLinks...)
 			foundOne = true
 		}
 	}
@@ -217,7 +215,7 @@ func (c *demoClient) buildHasSourceAt(ctx context.Context, link *srcMapLink, fil
 		if err != nil {
 			return nil, err
 		}
-		s, err = c.buildSourceResponse(link.sourceID, filter.Source)
+		s, err = c.buildSourceResponse(ctx, link.sourceID, filter.Source)
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +224,7 @@ func (c *demoClient) buildHasSourceAt(ctx context.Context, link *srcMapLink, fil
 		if err != nil {
 			return nil, err
 		}
-		s, err = c.buildSourceResponse(link.sourceID, nil)
+		s, err = c.buildSourceResponse(ctx, link.sourceID, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -17,7 +17,6 @@ package memmap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 
@@ -38,11 +37,11 @@ func GetStore() kv.Store {
 func (s *Store) Get(_ context.Context, c, k string, v any) error {
 	col, ok := s.m[c]
 	if !ok {
-		return fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
+		return fmt.Errorf("%w : Collection %q", kv.NotFoundError, c)
 	}
 	val, ok := col[k]
 	if !ok {
-		return fmt.Errorf("%w : %s %s", kv.NotFoundError, c, k)
+		return fmt.Errorf("%w : Key %q", kv.NotFoundError, k)
 	}
 
 	return copyAny(val, v)
@@ -66,19 +65,17 @@ func (s *Store) Keys(_ context.Context, c string) ([]string, error) {
 func copyAny(src any, dst any) error {
 	dP := reflect.ValueOf(dst)
 	if dP.Kind() != reflect.Pointer {
-		return errors.New("Destination not pointer")
+		return fmt.Errorf("%w : Not a pointer", kv.BadPtrError)
 	}
 	d := dP.Elem()
 	if !d.CanSet() {
-		return errors.New("Destination not settable")
+		return fmt.Errorf("%w : Pointer not settable", kv.BadPtrError)
 	}
 	s := reflect.ValueOf(src)
-	// if s.Kind() == reflect.Pointer {
-	// 	s = s.Elem()
+	// if s.Type() != d.Type() {
+	// 	return fmt.Errorf("%w : Source and Destination not same type: %v, %v",
+	// 		kv.BadPtrError, s.Type(), d.Type())
 	// }
-	if s.Type() != d.Type() {
-		return fmt.Errorf("Source and Destination not same type: %v, %v", s.Type(), d.Type())
-	}
 	d.Set(s)
 	return nil
 }

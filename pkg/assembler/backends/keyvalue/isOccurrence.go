@@ -129,14 +129,14 @@ func (c *demoClient) ingestOccurrence(ctx context.Context, subject model.Package
 		in.Pkg = pkgVer.ThisID
 	}
 
-	var sourceID string
+	var src *srcNameNode
 	if subject.Source != nil {
-		sid, err := getSourceIDFromInput(c, *subject.Source)
+		var err error
+		src, err = c.getSourceNameFromInput(ctx, *subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("IngestOccurrence :: %v", err)
 		}
-		sourceID = sid
-		in.Source = sid
+		in.Source = src.ThisID
 	}
 
 	out, err := byKeykv[*isOccurrenceStruct](ctx, occCol, in.Key(), c)
@@ -165,11 +165,9 @@ func (c *demoClient) ingestOccurrence(ctx context.Context, subject model.Package
 			return nil, err
 		}
 	} else {
-		s, err := byID[*srcNameNode](sourceID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
+		if src.setOccurrenceLinks(ctx, in.ThisID, c); err != nil {
+			return nil, err
 		}
-		s.setOccurrenceLinks(in.ThisID)
 	}
 	if err := setkv(ctx, occCol, in, c); err != nil {
 		return nil, err
@@ -197,7 +195,7 @@ func (c *demoClient) convOccurrence(ctx context.Context, in *isOccurrenceStruct)
 		}
 		o.Subject = p
 	} else {
-		s, err := c.buildSourceResponse(in.Source, nil)
+		s, err := c.buildSourceResponse(ctx, in.Source, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -272,12 +270,12 @@ func (c *demoClient) IsOccurrence(ctx context.Context, filter *model.IsOccurrenc
 		}
 	}
 	if !foundOne && filter != nil && filter.Subject != nil && filter.Subject.Source != nil {
-		exactSource, err := c.exactSource(filter.Subject.Source)
+		exactSource, err := c.exactSource(ctx, filter.Subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactSource != nil {
-			search = append(search, exactSource.occurrences...)
+			search = append(search, exactSource.Occurrences...)
 			foundOne = true
 		}
 	}
@@ -341,7 +339,7 @@ func (c *demoClient) addOccIfMatch(ctx context.Context, out []*model.IsOccurrenc
 			if link.Source == "" {
 				return out, nil
 			}
-			s, err := c.buildSourceResponse(link.Source, filter.Subject.Source)
+			s, err := c.buildSourceResponse(ctx, link.Source, filter.Subject.Source)
 			if err != nil {
 				return nil, err
 			}

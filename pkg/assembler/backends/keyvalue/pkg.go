@@ -100,7 +100,7 @@ func (n *pkgName) ID() string      { return n.ThisID }
 func (n *pkgVersion) ID() string   { return n.ThisID }
 
 func (n *pkgType) Neighbors(allowedEdges edgeMap) []string {
-	out := make([]string, 0, 1+len(n.Namespaces))
+	out := make([]string, 0, len(n.Namespaces))
 	for _, v := range n.Namespaces {
 		out = append(out, v)
 	}
@@ -308,7 +308,7 @@ func (n *pkgType) Key() string {
 	return n.Type
 }
 
-func (n *pkgType) AddNamespace(ctx context.Context, ns string, c *demoClient) error {
+func (n *pkgType) addNamespace(ctx context.Context, ns string, c *demoClient) error {
 	n.Namespaces = append(n.Namespaces, ns)
 	return setkv(ctx, pkgTypeCol, n, c)
 }
@@ -320,7 +320,7 @@ func (n *pkgNamespace) Key() string {
 	}, ":")
 }
 
-func (n *pkgNamespace) AddName(ctx context.Context, name string, c *demoClient) error {
+func (n *pkgNamespace) addName(ctx context.Context, name string, c *demoClient) error {
 	n.Names = append(n.Names, name)
 	return setkv(ctx, pkgNSCol, n, c)
 }
@@ -332,7 +332,7 @@ func (n *pkgName) Key() string {
 	}, ":")
 }
 
-func (n *pkgName) AddVersion(ctx context.Context, ver string, c *demoClient) error {
+func (n *pkgName) addVersion(ctx context.Context, ver string, c *demoClient) error {
 	n.Versions = append(n.Versions, ver)
 	return setkv(ctx, pkgNameCol, n, c)
 }
@@ -365,10 +365,16 @@ func (c *demoClient) IngestPackage(ctx context.Context, input model.PkgInputSpec
 	c.m.RLock()
 	outType, err := byKeykv[*pkgType](ctx, pkgTypeCol, inType.Key(), c)
 	c.m.RUnlock()
-	if err != nil { // fixme and is keyerror
+	if err != nil {
+		if !errors.Is(err, kv.NotFoundError) {
+			return nil, err
+		}
 		c.m.Lock()
 		outType, err = byKeykv[*pkgType](ctx, pkgTypeCol, inType.Key(), c)
-		if err != nil { // fixme and is keyerror
+		if err != nil {
+			if !errors.Is(err, kv.NotFoundError) {
+				return nil, err
+			}
 			inType.ThisID = c.getNextID()
 			if err := c.addToIndex(ctx, pkgTypeCol, inType); err != nil {
 				return nil, err
@@ -399,7 +405,7 @@ func (c *demoClient) IngestPackage(ctx context.Context, input model.PkgInputSpec
 			if err := setkv(ctx, pkgNSCol, inNamespace, c); err != nil {
 				return nil, err
 			}
-			if err := outType.AddNamespace(ctx, inNamespace.ThisID, c); err != nil {
+			if err := outType.addNamespace(ctx, inNamespace.ThisID, c); err != nil {
 				return nil, err
 			}
 			outNamespace = inNamespace
@@ -425,7 +431,7 @@ func (c *demoClient) IngestPackage(ctx context.Context, input model.PkgInputSpec
 			if err := setkv(ctx, pkgNameCol, inName, c); err != nil {
 				return nil, err
 			}
-			if err := outNamespace.AddName(ctx, inName.ThisID, c); err != nil {
+			if err := outNamespace.addName(ctx, inName.ThisID, c); err != nil {
 				return nil, err
 			}
 			outName = inName
@@ -453,7 +459,7 @@ func (c *demoClient) IngestPackage(ctx context.Context, input model.PkgInputSpec
 			if err := setkv(ctx, pkgVerCol, inVersion, c); err != nil {
 				return nil, err
 			}
-			if err := outName.AddVersion(ctx, inVersion.ThisID, c); err != nil {
+			if err := outName.addVersion(ctx, inVersion.ThisID, c); err != nil {
 				return nil, err
 			}
 			outVersion = inVersion
@@ -497,8 +503,8 @@ func (c *demoClient) Packages(ctx context.Context, filter *model.PkgSpec) ([]*mo
 		}
 		return []*model.Package{p}, nil
 	}
-	out := []*model.Package{}
 
+	out := []*model.Package{}
 	if filter != nil && filter.Type != nil {
 		inType := &pkgType{
 			Type: *filter.Type,
@@ -731,13 +737,13 @@ func (c *demoClient) buildPackageResponse(ctx context.Context, id string, filter
 			return nil, fmt.Errorf("Error retrieving node for id: %v : %w", currentID, err)
 		}
 	}
+	if filter != nil && noMatch(filter.Type, typeNode.Type) {
+		return nil, nil
+	}
 	p := model.Package{
 		ID:         typeNode.ThisID,
 		Type:       typeNode.Type,
 		Namespaces: pnsl,
-	}
-	if filter != nil && noMatch(filter.Type, p.Type) {
-		return nil, nil
 	}
 	return &p, nil
 }
@@ -892,7 +898,10 @@ func (c *demoClient) exactPackageName(ctx context.Context, filter *model.PkgSpec
 	if filter.ID != nil {
 		if pkgN, err := byIDkv[*pkgName](ctx, *filter.ID, c); err == nil {
 			return pkgN, nil
-		} else { // fixme check if err is not keyerror and bubble up if needed
+		} else {
+			if !errors.Is(err, kv.NotFoundError) && !errors.Is(err, errTypeNotMatch) {
+				return nil, err
+			}
 			return nil, nil
 		}
 	}
@@ -904,6 +913,9 @@ func (c *demoClient) exactPackageName(ctx context.Context, filter *model.PkgSpec
 	}
 	pkgT, err := byKeykv[*pkgType](ctx, pkgTypeCol, inType.Key(), c)
 	if err != nil {
+		if !errors.Is(err, kv.NotFoundError) && !errors.Is(err, errTypeNotMatch) {
+			return nil, err
+		}
 		return nil, nil
 	}
 
@@ -913,6 +925,9 @@ func (c *demoClient) exactPackageName(ctx context.Context, filter *model.PkgSpec
 	}
 	pkgNS, err := byKeykv[*pkgNamespace](ctx, pkgNSCol, inNS.Key(), c)
 	if err != nil {
+		if !errors.Is(err, kv.NotFoundError) && !errors.Is(err, errTypeNotMatch) {
+			return nil, err
+		}
 		return nil, nil
 	}
 
@@ -922,6 +937,9 @@ func (c *demoClient) exactPackageName(ctx context.Context, filter *model.PkgSpec
 	}
 	pkgN, err := byKeykv[*pkgName](ctx, pkgNameCol, inName.Key(), c)
 	if err != nil {
+		if !errors.Is(err, kv.NotFoundError) && !errors.Is(err, errTypeNotMatch) {
+			return nil, err
+		}
 		return nil, nil
 	}
 	return pkgN, nil

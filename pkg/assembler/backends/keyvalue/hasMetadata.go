@@ -18,7 +18,6 @@ package keyvalue
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -47,7 +46,7 @@ func (n *hasMetadataLink) Key() string {
 		n.PackageID,
 		n.ArtifactID,
 		n.SourceID,
-		fmt.Sprint(n.Timestamp.Unix()),
+		timeKey(n.Timestamp),
 		n.MDKey,
 		n.Value,
 		n.Justification,
@@ -143,15 +142,11 @@ func (c *demoClient) ingestHasMetadata(ctx context.Context, subject model.Packag
 		}
 		in.ArtifactID = foundArtStrct.ThisID
 	} else {
-		sourceID, err := getSourceIDFromInput(c, *subject.Source)
+		srcName, err := c.getSourceNameFromInput(ctx, *subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
-		srcName, err = byID[*srcNameNode](sourceID, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-		}
-		in.SourceID = srcName.ID()
+		in.SourceID = srcName.ThisID
 	}
 
 	out, err := byKeykv[*hasMetadataLink](ctx, hasMDCol, in.Key(), c)
@@ -186,7 +181,9 @@ func (c *demoClient) ingestHasMetadata(ctx context.Context, subject model.Packag
 		}
 	}
 	if srcName != nil {
-		srcName.setHasMetadataLinks(in.ThisID)
+		if err := srcName.setHasMetadataLinks(ctx, in.ThisID, c); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := setkv(ctx, hasMDCol, in, c); err != nil {
@@ -232,12 +229,12 @@ func (c *demoClient) HasMetadata(ctx context.Context, filter *model.HasMetadataS
 		}
 	}
 	if !foundOne && filter != nil && filter.Subject != nil && filter.Subject.Source != nil {
-		exactSource, err := c.exactSource(filter.Subject.Source)
+		exactSource, err := c.exactSource(ctx, filter.Subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactSource != nil {
-			search = append(search, exactSource.hasMetadataLinks...)
+			search = append(search, exactSource.HasMetadataLinks...)
 			foundOne = true
 		}
 	}
@@ -325,7 +322,7 @@ func (c *demoClient) buildHasMetadata(ctx context.Context, link *hasMetadataLink
 			}
 		}
 		if filter.Subject.Source != nil && link.SourceID != "" {
-			s, err = c.buildSourceResponse(link.SourceID, filter.Subject.Source)
+			s, err = c.buildSourceResponse(ctx, link.SourceID, filter.Subject.Source)
 			if err != nil {
 				return nil, err
 			}
@@ -344,7 +341,7 @@ func (c *demoClient) buildHasMetadata(ctx context.Context, link *hasMetadataLink
 			}
 		}
 		if link.SourceID != "" {
-			s, err = c.buildSourceResponse(link.SourceID, nil)
+			s, err = c.buildSourceResponse(ctx, link.SourceID, nil)
 			if err != nil {
 				return nil, err
 			}
