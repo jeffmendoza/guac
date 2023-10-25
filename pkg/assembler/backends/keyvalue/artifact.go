@@ -28,7 +28,6 @@ import (
 )
 
 // Internal data: Artifacts
-type artMap map[string]*artStruct
 type artStruct struct {
 	ThisID              string
 	Algorithm           string

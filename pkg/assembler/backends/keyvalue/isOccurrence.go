@@ -165,7 +165,7 @@ func (c *demoClient) ingestOccurrence(ctx context.Context, subject model.Package
 			return nil, err
 		}
 	} else {
-		if src.setOccurrenceLinks(ctx, in.ThisID, c); err != nil {
+		if err := src.setOccurrenceLinks(ctx, in.ThisID, c); err != nil {
 			return nil, err
 		}
 	}

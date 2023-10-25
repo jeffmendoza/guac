@@ -167,7 +167,7 @@ type demoClient struct {
 	certifyVulnerabilities certifyVulnerabilityList
 	vexs                   vexList
 	vulnerabilityEquals    vulnerabilityEqualList
-	vulnerabilityMetadatas vulnerabilityMetadataList
+s	vulnerabilityMetadatas vulnerabilityMetadataList
 
 	hashEquals      hashEqualList
 	pkgEquals       pkgEqualList

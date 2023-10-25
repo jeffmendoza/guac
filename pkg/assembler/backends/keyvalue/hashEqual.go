@@ -176,7 +176,7 @@ func (c *demoClient) matchArtifacts(ctx context.Context, filter []*model.Artifac
 		match := false
 		remove := -1
 		for i, v := range val {
-			a, err := byID[*artStruct](v, c)
+			a, err := byIDkv[*artStruct](ctx, v, c)
 			if err != nil {
 				return false
 			}
