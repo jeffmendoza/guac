@@ -115,7 +115,7 @@ func (c *demoClient) ingestHasMetadata(ctx context.Context, subject model.Packag
 	in := &hasMetadataLink{
 		MDKey:         hasMetadata.Key,
 		Value:         hasMetadata.Value,
-		Timestamp:     hasMetadata.Timestamp,
+		Timestamp:     hasMetadata.Timestamp.UTC(),
 		Justification: hasMetadata.Justification,
 		Origin:        hasMetadata.Origin,
 		Collector:     hasMetadata.Collector,
@@ -142,7 +142,8 @@ func (c *demoClient) ingestHasMetadata(ctx context.Context, subject model.Packag
 		}
 		in.ArtifactID = foundArtStrct.ThisID
 	} else {
-		srcName, err := c.getSourceNameFromInput(ctx, *subject.Source)
+		var err error
+		srcName, err = c.getSourceNameFromInput(ctx, *subject.Source)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 		}
@@ -163,8 +164,8 @@ func (c *demoClient) ingestHasMetadata(ctx context.Context, subject model.Packag
 		c.m.RLock() // relock so that defer unlock does not panic
 		return b, err
 	}
-	in.ThisID = c.getNextID()
 
+	in.ThisID = c.getNextID()
 	if err := c.addToIndex(ctx, hasMDCol, in); err != nil {
 		return nil, err
 	}

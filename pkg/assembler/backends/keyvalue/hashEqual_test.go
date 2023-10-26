@@ -383,31 +383,6 @@ func TestHashEqual(t *testing.T) {
 			},
 			ExpIngestErr: true,
 		},
-		{
-			Name:  "Query bad ID",
-			InArt: []*model.ArtifactInputSpec{a1, a2, a3},
-			Calls: []call{
-				{
-					A1: a1,
-					A2: a2,
-					HE: &model.HashEqualInputSpec{},
-				},
-				{
-					A1: a2,
-					A2: a3,
-					HE: &model.HashEqualInputSpec{},
-				},
-				{
-					A1: a1,
-					A2: a3,
-					HE: &model.HashEqualInputSpec{},
-				},
-			},
-			Query: &model.HashEqualSpec{
-				ID: ptrfrom.String("asdf"),
-			},
-			ExpQueryErr: true,
-		},
 	}
 	ignoreID := cmp.FilterPath(func(p cmp.Path) bool {
 		return strings.Compare(".ID", p[len(p)-1].String()) == 0

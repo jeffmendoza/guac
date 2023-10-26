@@ -60,7 +60,7 @@ func (n *scorecardLink) Neighbors(allowedEdges edgeMap) []string {
 	if allowedEdges[model.EdgeCertifyScorecardSource] {
 		return []string{n.SourceID}
 	}
-	return []string{}
+	return nil
 }
 
 func (n *scorecardLink) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
@@ -123,8 +123,8 @@ func (c *demoClient) certifyScorecard(ctx context.Context, source model.SourceIn
 		c.m.RLock() // relock so that defer unlock does not panic
 		return s, err
 	}
-	in.ThisID = c.getNextID()
 
+	in.ThisID = c.getNextID()
 	if err := c.addToIndex(ctx, cscCol, in); err != nil {
 		return nil, err
 	}

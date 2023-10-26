@@ -119,15 +119,17 @@ func (c *demoClient) ingestVEXStatement(ctx context.Context, subject model.Packa
 	}
 
 	var vulnerabilityVexLinks []string
-	vulnID, err := getVulnerabilityIDFromInput(c, vulnerability)
+	var vulnID string //fixme
+	// vulnID, err := getVulnerabilityIDFromInput(c, vulnerability)
+	// if err != nil {
+	// 	return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
+	// }
+	// foundVulnNode, err := byID[*vulnIDNode](vulnID, c)
+	foundVulnNode, err := c.getVulnerabilityFromInput(ctx, vulnerability)
 	if err != nil {
 		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 	}
-	foundVulnNode, err := byID[*vulnIDNode](vulnID, c)
-	if err != nil {
-		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-	}
-	vulnerabilityVexLinks = foundVulnNode.vexLinks
+	vulnerabilityVexLinks = foundVulnNode.VexLinks
 
 	var searchIDs []string
 	if len(subjectVexLinks) < len(vulnerabilityVexLinks) {
@@ -199,7 +201,9 @@ func (c *demoClient) ingestVEXStatement(ctx context.Context, subject model.Packa
 			}
 		}
 		if vulnID != "" {
-			foundVulnNode.setVexLinks(collectedCertifyVexLink.id)
+			if err := foundVulnNode.setVexLinks(ctx, collectedCertifyVexLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -255,12 +259,12 @@ func (c *demoClient) CertifyVEXStatement(ctx context.Context, filter *model.Cert
 		}
 	}
 	if !foundOne && filter != nil && filter.Vulnerability != nil {
-		exactVuln, err := c.exactVulnerability(filter.Vulnerability)
+		exactVuln, err := c.exactVulnerability(ctx, filter.Vulnerability)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactVuln != nil {
-			search = append(search, exactVuln.vexLinks...)
+			search = append(search, exactVuln.VexLinks...)
 			foundOne = true
 		}
 	}
@@ -361,14 +365,14 @@ func (c *demoClient) buildCertifyVEXStatement(ctx context.Context, link *vexLink
 
 	if filter != nil && filter.Vulnerability != nil {
 		if filter.Vulnerability != nil && link.vulnerabilityID != "" {
-			vuln, err = c.buildVulnResponse(link.vulnerabilityID, filter.Vulnerability)
+			vuln, err = c.buildVulnResponse(ctx, link.vulnerabilityID, filter.Vulnerability)
 			if err != nil {
 				return nil, err
 			}
 		}
 	} else {
 		if link.vulnerabilityID != "" {
-			vuln, err = c.buildVulnResponse(link.vulnerabilityID, nil)
+			vuln, err = c.buildVulnResponse(ctx, link.vulnerabilityID, nil)
 			if err != nil {
 				return nil, err
 			}

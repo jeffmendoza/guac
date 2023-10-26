@@ -77,27 +77,34 @@ var epsilon = math.Nextafter(100, 100.1) - 100
 
 const (
 	// Collection names must not have ":" in them
-	indexCol   = "index"
-	artCol     = "artifacts"
-	occCol     = "isOccurrences"
-	pkgTypeCol = "pkgTypes"
-	pkgNSCol   = "pkgNamespaces"
-	pkgNameCol = "pkgNames"
-	pkgVerCol  = "pkgVersions"
-	isDepCol   = "isDependencies"
-	hasMDCol   = "hasMetadatas"
-	hasSBOMCol = "hasSBOMs"
-	srcTypeCol = "srcTypes"
-	srcNSCol   = "srcNamespaces"
-	srcNameCol = "srcNames"
-	cgCol      = "certifyGoods"
-	cbCol      = "certifyBads"
-	builderCol = "builders"
-	licenseCol = "licenses"
-	clCol      = "certifyLegals"
-	cscCol     = "certifyScorecards"
-	slsaCol    = "hasSLSAs"
-	hsaCol     = "hasSourceAts"
+	indexCol    = "index"
+	artCol      = "artifacts"
+	occCol      = "isOccurrences"
+	pkgTypeCol  = "pkgTypes"
+	pkgNSCol    = "pkgNamespaces"
+	pkgNameCol  = "pkgNames"
+	pkgVerCol   = "pkgVersions"
+	isDepCol    = "isDependencies"
+	hasMDCol    = "hasMetadatas"
+	hasSBOMCol  = "hasSBOMs"
+	srcTypeCol  = "srcTypes"
+	srcNSCol    = "srcNamespaces"
+	srcNameCol  = "srcNames"
+	cgCol       = "certifyGoods"
+	cbCol       = "certifyBads"
+	builderCol  = "builders"
+	licenseCol  = "licenses"
+	clCol       = "certifyLegals"
+	cscCol      = "certifyScorecards"
+	slsaCol     = "hasSLSAs"
+	hsaCol      = "hasSourceAts"
+	hashEqCol   = "hashEquals"
+	pkgEqCol    = "pkgEquals"
+	pocCol      = "pointOfContacts"
+	vulnTypeCol = "vulnTypes"
+	vulnIDCol   = "vulnIDs"
+	vulnEqCol   = "vulnEquals"
+	vulnMDCol   = "vulnMetadatas"
 )
 
 func typeColMap(col string) node {
@@ -142,6 +149,20 @@ func typeColMap(col string) node {
 		return &hasSLSAStruct{}
 	case hsaCol:
 		return &srcMapLink{}
+	case hashEqCol:
+		return &hashEqualStruct{}
+	case pkgEqCol:
+		return &pkgEqualStruct{}
+	case pocCol:
+		return &pointOfContactLink{}
+	case vulnTypeCol:
+		return &vulnTypeStruct{}
+	case vulnIDCol:
+		return &vulnIDNode{}
+	case vulnEqCol:
+		return &vulnerabilityEqualLink{}
+	case vulnMDCol:
+		return &vulnerabilityMetadataLink{}
 	}
 	//?
 	return &artStruct{}
@@ -162,16 +183,8 @@ type demoClient struct {
 
 	index indexType
 
-	vulnerabilities vulnTypeMap
-
 	certifyVulnerabilities certifyVulnerabilityList
 	vexs                   vexList
-	vulnerabilityEquals    vulnerabilityEqualList
-	vulnerabilityMetadatas vulnerabilityMetadataList
-
-	hashEquals      hashEqualList
-	pkgEquals       pkgEqualList
-	pointOfContacts pointOfContactList
 }
 
 func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, error) {
@@ -184,8 +197,7 @@ func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, 
 		//kv: &redis.Store{},
 		kv: memmap.GetStore(),
 		//kv:              kv,
-		index:           indexType{},
-		vulnerabilities: vulnTypeMap{},
+		index: indexType{},
 	}, nil
 }
 
@@ -276,6 +288,7 @@ func byKeykv[E node](ctx context.Context, coll string, k string, c *demoClient) 
 }
 
 func setkv(ctx context.Context, coll string, n node, c *demoClient) error {
+	// validate type?
 	return c.kv.Set(ctx, coll, n.Key(), n)
 }
 

@@ -89,15 +89,16 @@ func (c *demoClient) ingestVulnerability(ctx context.Context, packageArg model.P
 
 	var vulnerabilityLinks []string
 
-	vulnID, err := getVulnerabilityIDFromInput(c, vulnerability)
+	// vulnID, err :=
+	// if err != nil {
+	// 	return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
+	// }
+	var vulnID string //fixme
+	foundVulnNode, err := c.getVulnerabilityFromInput(ctx, vulnerability)
 	if err != nil {
 		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
 	}
-	foundVulnNode, err := byID[*vulnIDNode](vulnID, c)
-	if err != nil {
-		return nil, gqlerror.Errorf("%v ::  %s", funcName, err)
-	}
-	vulnerabilityLinks = foundVulnNode.certifyVulnLinks
+	vulnerabilityLinks = foundVulnNode.CertifyVulnLinks
 
 	var searchIDs []string
 	if len(packageVulns) < len(vulnerabilityLinks) {
@@ -155,7 +156,9 @@ func (c *demoClient) ingestVulnerability(ctx context.Context, packageArg model.P
 			return nil, err
 		}
 		if vulnID != "" {
-			foundVulnNode.setVulnerabilityLinks(collectedCertifyVulnLink.id)
+			if err := foundVulnNode.setVulnerabilityLinks(ctx, collectedCertifyVulnLink.id, c); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -202,7 +205,7 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 	if !foundOne && filter != nil && filter.Vulnerability != nil &&
 		filter.Vulnerability.NoVuln != nil && *filter.Vulnerability.NoVuln {
 
-		exactVuln, err := c.exactVulnerability(&model.VulnerabilitySpec{
+		exactVuln, err := c.exactVulnerability(ctx, &model.VulnerabilitySpec{
 			Type:            ptrfrom.String(noVulnType),
 			VulnerabilityID: ptrfrom.String(""),
 		})
@@ -210,7 +213,7 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactVuln != nil {
-			search = append(search, exactVuln.certifyVulnLinks...)
+			search = append(search, exactVuln.CertifyVulnLinks...)
 			foundOne = true
 		}
 	} else if !foundOne && filter != nil && filter.Vulnerability != nil {
@@ -221,12 +224,12 @@ func (c *demoClient) CertifyVuln(ctx context.Context, filter *model.CertifyVulnS
 			}
 		}
 
-		exactVuln, err := c.exactVulnerability(filter.Vulnerability)
+		exactVuln, err := c.exactVulnerability(ctx, filter.Vulnerability)
 		if err != nil {
 			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 		}
 		if exactVuln != nil {
-			search = append(search, exactVuln.certifyVulnLinks...)
+			search = append(search, exactVuln.CertifyVulnLinks...)
 			foundOne = true
 		}
 	}
@@ -309,7 +312,7 @@ func (c *demoClient) buildCertifyVulnerability(ctx context.Context, link *certif
 
 	if filter != nil && filter.Vulnerability != nil {
 		if filter.Vulnerability != nil && link.vulnerabilityID != "" {
-			vuln, err = c.buildVulnResponse(link.vulnerabilityID, filter.Vulnerability)
+			vuln, err = c.buildVulnResponse(ctx, link.vulnerabilityID, filter.Vulnerability)
 			if err != nil {
 				return nil, err
 			}
@@ -323,7 +326,7 @@ func (c *demoClient) buildCertifyVulnerability(ctx context.Context, link *certif
 		}
 	} else {
 		if link.vulnerabilityID != "" {
-			vuln, err = c.buildVulnResponse(link.vulnerabilityID, nil)
+			vuln, err = c.buildVulnResponse(ctx, link.vulnerabilityID, nil)
 			if err != nil {
 				return nil, err
 			}

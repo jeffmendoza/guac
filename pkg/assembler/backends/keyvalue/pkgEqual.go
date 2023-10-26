@@ -17,31 +17,39 @@ package keyvalue
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
+	"github.com/guacsec/guac/pkg/assembler/kv"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-type (
-	pkgEqualList   []*pkgEqualStruct
-	pkgEqualStruct struct {
-		id            string
-		pkgs          []string
-		justification string
-		origin        string
-		collector     string
-	}
-)
+type pkgEqualStruct struct {
+	ThisID        string
+	Pkgs          []string
+	Justification string
+	Origin        string
+	Collector     string
+}
 
-func (n *pkgEqualStruct) ID() string  { return n.id }
-func (n *pkgEqualStruct) Key() string { return n.id }
+func (n *pkgEqualStruct) ID() string { return n.ThisID }
+func (n *pkgEqualStruct) Key() string {
+	return strings.Join([]string{
+		fmt.Sprint(n.Pkgs),
+		n.Justification,
+		n.Origin,
+		n.Collector,
+	}, ":")
+}
 
 func (n *pkgEqualStruct) Neighbors(allowedEdges edgeMap) []string {
 	if allowedEdges[model.EdgePkgEqualPackage] {
-		return n.pkgs
+		return n.Pkgs
 	}
-	return []string{}
+	return nil
 }
 
 func (n *pkgEqualStruct) BuildModelNode(ctx context.Context, c *demoClient) (model.Node, error) {
@@ -64,12 +72,12 @@ func (c *demoClient) IngestPkgEquals(ctx context.Context, pkgs []*model.PkgInput
 
 func (c *demoClient) convPkgEqual(ctx context.Context, in *pkgEqualStruct) (*model.PkgEqual, error) {
 	out := &model.PkgEqual{
-		ID:            in.id,
-		Justification: in.justification,
-		Origin:        in.origin,
-		Collector:     in.collector,
+		ID:            in.ThisID,
+		Justification: in.Justification,
+		Origin:        in.Origin,
+		Collector:     in.Collector,
 	}
-	for _, id := range in.pkgs {
+	for _, id := range in.Pkgs {
 		p, err := c.buildPackageResponse(ctx, id, nil)
 		if err != nil {
 			return nil, err
@@ -85,6 +93,13 @@ func (c *demoClient) IngestPkgEqual(ctx context.Context, pkg model.PkgInputSpec,
 
 func (c *demoClient) ingestPkgEqual(ctx context.Context, pkg model.PkgInputSpec, depPkg model.PkgInputSpec, pkgEqual model.PkgEqualInputSpec, readOnly bool) (*model.PkgEqual, error) {
 	funcName := "IngestPkgEqual"
+
+	in := &pkgEqualStruct{
+		Justification: pkgEqual.Justification,
+		Origin:        pkgEqual.Origin,
+		Collector:     pkgEqual.Collector,
+	}
+
 	lock(&c.m, readOnly)
 	defer unlock(&c.m, readOnly)
 
@@ -99,18 +114,14 @@ func (c *demoClient) ingestPkgEqual(ctx context.Context, pkg model.PkgInputSpec,
 		pIDs = append(pIDs, p.ThisID)
 	}
 	slices.Sort(pIDs)
+	in.Pkgs = pIDs
 
-	for _, id := range ps[0].PkgEquals {
-		cp, err := byID[*pkgEqualStruct](id, c)
-		if err != nil {
-			return nil, gqlerror.Errorf("%v :: %v", funcName, err)
-		}
-		if slices.Equal(cp.pkgs, pIDs) &&
-			cp.justification == pkgEqual.Justification &&
-			cp.origin == pkgEqual.Origin &&
-			cp.collector == pkgEqual.Collector {
-			return c.convPkgEqual(ctx, cp)
-		}
+	out, err := byKeykv[*pkgEqualStruct](ctx, pkgEqCol, in.Key(), c)
+	if err == nil {
+		return c.convPkgEqual(ctx, out)
+	}
+	if !errors.Is(err, kv.NotFoundError) {
+		return nil, err
 	}
 
 	if readOnly {
@@ -120,22 +131,20 @@ func (c *demoClient) ingestPkgEqual(ctx context.Context, pkg model.PkgInputSpec,
 		return cp, err
 	}
 
-	cp := &pkgEqualStruct{
-		id:            c.getNextID(),
-		pkgs:          pIDs,
-		justification: pkgEqual.Justification,
-		origin:        pkgEqual.Origin,
-		collector:     pkgEqual.Collector,
+	in.ThisID = c.getNextID()
+	if err := c.addToIndex(ctx, pkgEqCol, in); err != nil {
+		return nil, err
 	}
-	c.index[cp.id] = cp
 	for _, p := range ps {
-		if err := p.setPkgEquals(ctx, cp.id, c); err != nil {
+		if err := p.setPkgEquals(ctx, in.ThisID, c); err != nil {
 			return nil, err
 		}
 	}
-	c.pkgEquals = append(c.pkgEquals, cp)
+	if err := setkv(ctx, pkgEqCol, in, c); err != nil {
+		return nil, err
+	}
 
-	return c.convPkgEqual(ctx, cp)
+	return c.convPkgEqual(ctx, in)
 }
 
 // Query PkgEqual
@@ -145,7 +154,7 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 	c.m.RLock()
 	defer c.m.RUnlock()
 	if filter.ID != nil {
-		link, err := byID[*pkgEqualStruct](*filter.ID, c)
+		link, err := byIDkv[*pkgEqualStruct](ctx, *filter.ID, c)
 		if err != nil {
 			// Not found
 			return nil, nil
@@ -172,7 +181,7 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 	var out []*model.PkgEqual
 	if len(search) > 0 {
 		for _, id := range search {
-			link, err := byID[*pkgEqualStruct](id, c)
+			link, err := byIDkv[*pkgEqualStruct](ctx, id, c)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
 			}
@@ -182,8 +191,15 @@ func (c *demoClient) PkgEqual(ctx context.Context, filter *model.PkgEqualSpec) (
 			}
 		}
 	} else {
-		for _, link := range c.pkgEquals {
-			var err error
+		peKeys, err := c.kv.Keys(ctx, pkgEqCol)
+		if err != nil {
+			return nil, err
+		}
+		for _, pek := range peKeys {
+			link, err := byKeykv[*pkgEqualStruct](ctx, pkgEqCol, pek, c)
+			if err != nil {
+				return nil, err
+			}
 			out, err = c.addCPIfMatch(ctx, out, filter, link)
 			if err != nil {
 				return nil, gqlerror.Errorf("%v :: %v", funcName, err)
@@ -197,9 +213,9 @@ func (c *demoClient) addCPIfMatch(ctx context.Context, out []*model.PkgEqual,
 	filter *model.PkgEqualSpec, link *pkgEqualStruct) (
 	[]*model.PkgEqual, error,
 ) {
-	if noMatch(filter.Justification, link.justification) ||
-		noMatch(filter.Origin, link.origin) ||
-		noMatch(filter.Collector, link.collector) {
+	if noMatch(filter.Justification, link.Justification) ||
+		noMatch(filter.Origin, link.Origin) ||
+		noMatch(filter.Collector, link.Collector) {
 		return out, nil
 	}
 	for _, ps := range filter.Packages {
@@ -207,7 +223,7 @@ func (c *demoClient) addCPIfMatch(ctx context.Context, out []*model.PkgEqual,
 			continue
 		}
 		found := false
-		for _, pid := range link.pkgs {
+		for _, pid := range link.Pkgs {
 			p, err := c.buildPackageResponse(ctx, pid, ps)
 			if err != nil {
 				return nil, err
