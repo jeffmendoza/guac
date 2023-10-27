@@ -66,7 +66,7 @@ type node interface {
 	Key() string
 }
 
-type indexType map[string]node
+//type indexType map[string]node
 
 var errNotFound = errors.New("not found")
 var errTypeNotMatch = errors.New("Stored type does not match")
@@ -105,6 +105,8 @@ const (
 	vulnIDCol   = "vulnIDs"
 	vulnEqCol   = "vulnEquals"
 	vulnMDCol   = "vulnMetadatas"
+	cVEXCol     = "certifyVEXs"
+	cVulnCol    = "certifyVulns"
 )
 
 func typeColMap(col string) node {
@@ -163,6 +165,10 @@ func typeColMap(col string) node {
 		return &vulnerabilityEqualLink{}
 	case vulnMDCol:
 		return &vulnerabilityMetadataLink{}
+	case cVEXCol:
+		return &vexLink{}
+	case cVulnCol:
+		return &certifyVulnerabilityLink{}
 	}
 	//?
 	return &artStruct{}
@@ -178,13 +184,6 @@ type demoClient struct {
 	id uint32
 	m  sync.RWMutex
 	kv kv.Store
-
-	// -- delete below here
-
-	index indexType
-
-	certifyVulnerabilities certifyVulnerabilityList
-	vexs                   vexList
 }
 
 func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, error) {
@@ -197,7 +196,6 @@ func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, 
 		//kv: &redis.Store{},
 		kv: memmap.GetStore(),
 		//kv:              kv,
-		index: indexType{},
 	}, nil
 }
 
@@ -252,18 +250,18 @@ func floatEqual(x float64, y float64) bool {
 }
 
 // delete this
-func byID[E node](id string, c *demoClient) (E, error) {
-	var nl E
-	o, ok := c.index[id]
-	if !ok {
-		return nl, fmt.Errorf("%w : id not in index", errNotFound)
-	}
-	s, ok := o.(E)
-	if !ok {
-		return nl, fmt.Errorf("%w : node not a %T", errNotFound, nl)
-	}
-	return s, nil
-}
+// func byID[E node](id string, c *demoClient) (E, error) {
+// 	var nl E
+// 	o, ok := c.index[id]
+// 	if !ok {
+// 		return nl, fmt.Errorf("%w : id not in index", errNotFound)
+// 	}
+// 	s, ok := o.(E)
+// 	if !ok {
+// 		return nl, fmt.Errorf("%w : node not a %T", errNotFound, nl)
+// 	}
+// 	return s, nil
+// }
 
 func byIDkv[E node](ctx context.Context, id string, c *demoClient) (E, error) {
 	var nl E

@@ -176,7 +176,7 @@ func Test_Nodes(t *testing.T) {
 	}, {
 		name:     "source",
 		srcInput: testdata.S1,
-		want:     []model.Node{testdata.S1out},
+		want:     []model.Node{s1out},
 		wantErr:  false,
 	}, {
 		name:      "vulnerability",
@@ -253,7 +253,7 @@ func Test_Nodes(t *testing.T) {
 			},
 		},
 		want: []model.Node{&model.CertifyScorecard{
-			Source: testdata.S2out,
+			Source: s2out,
 			Scorecard: &model.Scorecard{
 				Checks: []*model.ScorecardCheck{},
 				Origin: "test origin",
@@ -380,7 +380,7 @@ func Test_Nodes(t *testing.T) {
 		},
 		want: []model.Node{&model.HasSourceAt{
 			Package: testdata.P2out,
-			Source:  testdata.S1out,
+			Source:  s1out,
 		}},
 	}, {
 		name:  "isDependency",
