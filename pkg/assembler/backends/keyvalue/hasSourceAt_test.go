@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/guacsec/guac/internal/testing/ptrfrom"
+	"github.com/guacsec/guac/internal/testing/stablememmap"
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
 )
@@ -436,11 +437,11 @@ func TestHasSourceAt(t *testing.T) {
 			},
 			ExpHSA: []*model.HasSourceAt{
 				{
-					Package: p1out,
+					Package: p1outName,
 					Source:  s1out,
 				},
 				{
-					Package: p1outName,
+					Package: p1out,
 					Source:  s1out,
 				},
 			},
@@ -482,7 +483,8 @@ func TestHasSourceAt(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -734,7 +736,8 @@ func TestIngestHasSourceAts(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -843,7 +846,8 @@ func TestHasSourceAtNeighbors(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}

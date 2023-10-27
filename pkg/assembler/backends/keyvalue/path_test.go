@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/guacsec/guac/internal/testing/stablememmap"
 	"github.com/guacsec/guac/internal/testing/testdata"
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
@@ -496,7 +497,8 @@ func Test_Nodes(t *testing.T) {
 	}, cmp.Ignore())
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}

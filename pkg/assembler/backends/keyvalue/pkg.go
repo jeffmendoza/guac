@@ -100,25 +100,17 @@ func (n *pkgName) ID() string      { return n.ThisID }
 func (n *pkgVersion) ID() string   { return n.ThisID }
 
 func (n *pkgType) Neighbors(allowedEdges edgeMap) []string {
-	out := make([]string, 0, len(n.Namespaces))
-	for _, v := range n.Namespaces {
-		out = append(out, v)
-	}
-	return out
+	return n.Namespaces
 }
 func (n *pkgNamespace) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 1+len(n.Names))
-	for _, v := range n.Names {
-		out = append(out, v)
-	}
+	out = append(out, n.Names...)
 	out = append(out, n.Parent)
 	return out
 }
 func (n *pkgName) Neighbors(allowedEdges edgeMap) []string {
 	out := []string{n.Parent}
-	for _, v := range n.Versions {
-		out = append(out, v)
-	}
+	out = append(out, n.Versions...)
 
 	if allowedEdges[model.EdgePackageHasSourceAt] {
 		out = append(out, n.SrcMapLinks...)

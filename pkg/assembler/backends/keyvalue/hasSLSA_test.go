@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/guacsec/guac/internal/testing/ptrfrom"
+	"github.com/guacsec/guac/internal/testing/stablememmap"
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
 )
@@ -298,14 +299,14 @@ func TestHasSLSA(t *testing.T) {
 					Subject: a1out,
 					Slsa: &model.Slsa{
 						BuiltBy:   b1out,
-						BuiltFrom: []*model.Artifact{a2out},
+						BuiltFrom: []*model.Artifact{a2out, a3out},
 					},
 				},
 				{
 					Subject: a1out,
 					Slsa: &model.Slsa{
 						BuiltBy:   b1out,
-						BuiltFrom: []*model.Artifact{a2out, a3out},
+						BuiltFrom: []*model.Artifact{a2out},
 					},
 				},
 			},
@@ -475,7 +476,8 @@ func TestHasSLSA(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -681,14 +683,14 @@ func TestIngestHasSLSAs(t *testing.T) {
 					Subject: a1out,
 					Slsa: &model.Slsa{
 						BuiltBy:   b1out,
-						BuiltFrom: []*model.Artifact{a2out},
+						BuiltFrom: []*model.Artifact{a2out, a3out},
 					},
 				},
 				{
 					Subject: a1out,
 					Slsa: &model.Slsa{
 						BuiltBy:   b1out,
-						BuiltFrom: []*model.Artifact{a2out, a3out},
+						BuiltFrom: []*model.Artifact{a2out},
 					},
 				},
 			},
@@ -700,7 +702,8 @@ func TestIngestHasSLSAs(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -808,7 +811,8 @@ func TestHasSLSANeighbors(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/guacsec/guac/internal/testing/ptrfrom"
+	"github.com/guacsec/guac/internal/testing/stablememmap"
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/backends/keyvalue"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
@@ -394,7 +395,8 @@ func TestPkgEqual(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -607,7 +609,8 @@ func TestIngestPkgEquals(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -702,7 +705,8 @@ func TestPkgEqualNeighbors(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}

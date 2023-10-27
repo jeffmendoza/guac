@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/guacsec/guac/internal/testing/ptrfrom"
+	"github.com/guacsec/guac/internal/testing/stablememmap"
 	"github.com/guacsec/guac/pkg/assembler/backends"
 	"github.com/guacsec/guac/pkg/assembler/graphql/model"
 )
@@ -31,6 +32,12 @@ var (
 	mAll      = model.MatchFlags{Pkg: model.PkgMatchTypeAllVersions}
 	mSpecific = model.MatchFlags{Pkg: model.PkgMatchTypeSpecificVersion}
 )
+
+// func lessID(a, b *model.IsDependency) int {
+// 	ab, _ := json.Marshal(a)
+// 	bb, _ := json.Marshal(b)
+// 	return bytes.Compare(ab, bb)
+// }
 
 func TestIsDependency(t *testing.T) {
 	type call struct {
@@ -519,12 +526,12 @@ func TestIsDependency(t *testing.T) {
 			ExpID: []*model.IsDependency{
 				{
 					Package:           p3out,
-					DependencyPackage: p2out,
+					DependencyPackage: p2outName,
 					Justification:     "test justification",
 				},
 				{
 					Package:           p3out,
-					DependencyPackage: p2outName,
+					DependencyPackage: p2out,
 					Justification:     "test justification",
 				},
 			},
@@ -536,7 +543,8 @@ func TestIsDependency(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -561,28 +569,8 @@ func TestIsDependency(t *testing.T) {
 			if err != nil {
 				return
 			}
-			less := func(a, b *model.IsDependency) int {
-				if len(a.Package.Namespaces[0].Names[0].Versions) !=
-					len(b.Package.Namespaces[0].Names[0].Versions) {
-					return len(a.Package.Namespaces[0].Names[0].Versions) -
-						len(b.Package.Namespaces[0].Names[0].Versions)
-				}
-				if len(a.Package.Namespaces[0].Names[0].Versions) == 0 {
-					return strings.Compare(a.Package.Namespaces[0].Names[0].Name,
-						b.Package.Namespaces[0].Names[0].Name)
-				}
-				return strings.Compare(a.Package.Namespaces[0].Names[0].Versions[0].Version,
-					b.Package.Namespaces[0].Names[0].Versions[0].Version)
-			}
-			slices.SortFunc(got, less)
-			slices.SortFunc(test.ExpID, less)
-			// less := func(a, b *model.Package) bool { return a.Version < b.Version }
-			// for _, he := range got {
-			// 	slices.SortFunc(he.Packages, less)
-			// }
-			// for _, he := range test.ExpID {
-			// 	slices.SortFunc(he.Packages, less)
-			// }
+			//slices.SortFunc(got, lessID)
+			//slices.SortFunc(test.ExpID, lessID)
 			if diff := cmp.Diff(test.ExpID, got, ignoreID); diff != "" {
 				t.Errorf("Unexpected results. (-want +got):\n%s", diff)
 			}
@@ -641,7 +629,8 @@ func TestIsDependencies(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}
@@ -731,7 +720,8 @@ func TestIsDependencyNeighbors(t *testing.T) {
 	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			b, err := backends.Get("keyvalue", nil, nil)
+			store := stablememmap.GetStore()
+			b, err := backends.Get("keyvalue", nil, store)
 			if err != nil {
 				t.Fatalf("Could not instantiate testing backend: %v", err)
 			}

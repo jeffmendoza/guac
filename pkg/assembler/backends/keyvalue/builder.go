@@ -125,6 +125,9 @@ func (c *demoClient) Builders(ctx context.Context, builderSpec *model.BuilderSpe
 	}
 	var builders []*model.Builder
 	bKeys, err := c.kv.Keys(ctx, builderCol)
+	if err != nil {
+		return nil, err
+	}
 	for _, bk := range bKeys {
 		b, err := byKeykv[*builderStruct](ctx, builderCol, bk, c)
 		if err != nil {

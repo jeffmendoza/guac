@@ -186,7 +186,12 @@ type demoClient struct {
 	kv kv.Store
 }
 
-func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, error) {
+func getBackend(ctx context.Context, opts backends.BackendArgs) (backends.Backend, error) {
+
+	store, ok := opts.(kv.Store)
+	if !ok {
+		store = memmap.GetStore()
+	}
 	//kv, err := tikv.GetStore(ctx)
 	// kv, err := memmap.GetStore()
 	// if err != nil {
@@ -194,7 +199,7 @@ func getBackend(ctx context.Context, _ backends.BackendArgs) (backends.Backend, 
 	// }
 	return &demoClient{
 		//kv: &redis.Store{},
-		kv: memmap.GetStore(),
+		kv: store,
 		//kv:              kv,
 	}, nil
 }
@@ -206,12 +211,12 @@ func noMatch(filter *string, value string) bool {
 	return false
 }
 
-func noMatchInput(filter *string, value string) bool {
-	if filter != nil {
-		return value != *filter
-	}
-	return value != ""
-}
+// func noMatchInput(filter *string, value string) bool {
+// 	if filter != nil {
+// 		return value != *filter
+// 	}
+// 	return value != ""
+// }
 
 func nilToEmpty(input *string) string {
 	if input == nil {
@@ -220,15 +225,15 @@ func nilToEmpty(input *string) string {
 	return *input
 }
 
-func timePtrEqual(a, b *time.Time) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a != nil && b != nil {
-		return a.Equal(*b)
-	}
-	return false
-}
+// func timePtrEqual(a, b *time.Time) bool {
+// 	if a == nil && b == nil {
+// 		return true
+// 	}
+// 	if a != nil && b != nil {
+// 		return a.Equal(*b)
+// 	}
+// 	return false
+// }
 
 func toLower(filter *string) *string {
 	if filter != nil {
@@ -245,9 +250,9 @@ func noMatchFloat(filter *float64, value float64) bool {
 	return false
 }
 
-func floatEqual(x float64, y float64) bool {
-	return math.Abs(x-y) < epsilon
-}
+// func floatEqual(x float64, y float64) bool {
+// 	return math.Abs(x-y) < epsilon
+// }
 
 // delete this
 // func byID[E node](id string, c *demoClient) (E, error) {

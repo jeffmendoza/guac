@@ -170,6 +170,9 @@ func (c *demoClient) Licenses(ctx context.Context, licenseSpec *model.LicenseSpe
 
 	var rv []*model.License
 	lKeys, err := c.kv.Keys(ctx, licenseCol)
+	if err != nil {
+		return nil, err
+	}
 	for _, lk := range lKeys {
 		l, err := byKeykv[*licStruct](ctx, licenseCol, lk, c)
 		if err != nil {

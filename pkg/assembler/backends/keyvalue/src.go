@@ -80,17 +80,11 @@ func (n *srcNameNode) Key() string {
 }
 
 func (n *srcType) Neighbors(allowedEdges edgeMap) []string {
-	out := make([]string, 0, len(n.Namespaces))
-	for _, v := range n.Namespaces {
-		out = append(out, v)
-	}
-	return out
+	return n.Namespaces
 }
 func (n *srcNamespace) Neighbors(allowedEdges edgeMap) []string {
 	out := make([]string, 0, 1+len(n.Names))
-	for _, v := range n.Names {
-		out = append(out, v)
-	}
+	out = append(out, n.Names...)
 	out = append(out, n.Parent)
 	return out
 }
