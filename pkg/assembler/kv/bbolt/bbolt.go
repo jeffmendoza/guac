@@ -20,15 +20,19 @@ import (
 	"fmt"
 
 	"github.com/guacsec/guac/pkg/assembler/kv"
+	jsoniter "github.com/json-iterator/go"
 	"go.etcd.io/bbolt"
 )
+
+var json = jsoniter.ConfigFastest
 
 type Store struct {
 	db *bbolt.DB
 }
 
 func GetStore() (kv.Store, error) {
-	// need to close
+	// TODO add options to take a connection string / db name
+	// FIXME need to close database
 	db, err := bbolt.Open("./my.db", 0600, nil)
 	if err != nil {
 		return nil, err
@@ -38,11 +42,8 @@ func GetStore() (kv.Store, error) {
 	}, nil
 }
 
-// check interface compatability
-var _ kv.Store = &Store{}
-
-func (s *Store) Get(ctx context.Context, c, k string) (string, error) {
-	// just create now, should check instead, or create all at startup
+func (s *Store) Get(ctx context.Context, c, k string, v any) error {
+	// TODO just creating bucket here, should check if exists and return error
 	if err := s.db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(c))
 		if err != nil {
@@ -50,7 +51,7 @@ func (s *Store) Get(ctx context.Context, c, k string) (string, error) {
 		}
 		return nil
 	}); err != nil {
-		return "", err
+		return err
 	}
 	var val []byte
 	if err := s.db.View(func(tx *bbolt.Tx) error {
@@ -59,28 +60,31 @@ func (s *Store) Get(ctx context.Context, c, k string) (string, error) {
 		val = b.Get([]byte(k))
 		return nil
 	}); err != nil {
-		return "", err
+		return err
 	}
 	if val == nil {
-		return "", kv.KeyError
+		return kv.NotFoundError
 	}
-	return string(val), nil
+	return json.Unmarshal(val, v)
 }
 
-func (s *Store) Set(ctx context.Context, c, k, v string) error {
-	err := s.db.Update(func(tx *bbolt.Tx) error {
+func (s *Store) Set(ctx context.Context, c, k string, v any) error {
+	bts, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	if err := s.db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(c))
 		if err != nil {
 			return fmt.Errorf("create bucket: %s", err)
 		}
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(c))
-		return b.Put([]byte(k), []byte(v))
+		return b.Put([]byte(k), bts)
 	})
 }
 

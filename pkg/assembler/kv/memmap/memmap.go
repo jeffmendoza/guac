@@ -72,6 +72,7 @@ func copyAny(src any, dst any) error {
 		return fmt.Errorf("%w : Pointer not settable", kv.BadPtrError)
 	}
 	s := reflect.ValueOf(src)
+	// Sometimes dst is an interface containing the same type as src.
 	// if s.Type() != d.Type() {
 	// 	return fmt.Errorf("%w : Source and Destination not same type: %v, %v",
 	// 		kv.BadPtrError, s.Type(), d.Type())

@@ -20,16 +20,20 @@ import (
 	"strings"
 
 	"github.com/guacsec/guac/pkg/assembler/kv"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/tikv/client-go/v2/config"
 	kvti "github.com/tikv/client-go/v2/kv"
 	"github.com/tikv/client-go/v2/rawkv"
 )
+
+var json = jsoniter.ConfigFastest
 
 type Store struct {
 	c *rawkv.Client
 }
 
 func GetStore(ctx context.Context) (kv.Store, error) {
+	// TODO add options to take a connection string
 	c, err := rawkv.NewClient(ctx, []string{"127.0.0.1:2379"}, config.Security{})
 	if err != nil {
 		return nil, err
@@ -39,18 +43,27 @@ func GetStore(ctx context.Context) (kv.Store, error) {
 	}, nil
 }
 
-func (s *Store) Get(ctx context.Context, c, k string) (string, error) {
+func (s *Store) Get(ctx context.Context, c, k string, v any) error {
 	ck := strings.Join([]string{c, k}, ":")
 	bts, err := s.c.Get(ctx, []byte(ck))
-	return string(bts), err
+	// FIXME, return kv.NotFoundError if not found
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bts, v)
 }
 
-func (s *Store) Set(ctx context.Context, c, k, v string) error {
+func (s *Store) Set(ctx context.Context, c, k string, v any) error {
 	ck := strings.Join([]string{c, k}, ":")
-	return s.c.Put(ctx, []byte(ck), []byte(v))
+	bts, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return s.c.Put(ctx, []byte(ck), bts)
 }
 
 func (s *Store) Keys(ctx context.Context, c string) ([]string, error) {
+	// TODO implement scanning in kv interface
 	ks, _, err := s.c.Scan(ctx, []byte(c), kvti.PrefixNextKey([]byte(c)), 10000, rawkv.ScanKeyOnly())
 	if err != nil {
 		return nil, err

@@ -31,6 +31,7 @@ type Store struct {
 }
 
 func GetStore() (kv.Store, error) {
+	// TODO add options to take a connection string
 	//opt, err := redis.ParseURL("redis://<user>:<pass>@localhost:6379/<db>")
 	//opt, err := redis.ParseURL("redis://user@localhost:6379/0")
 	opt, err := redis.ParseURL("redis://user@localhost:2379/0")
@@ -45,7 +46,8 @@ func GetStore() (kv.Store, error) {
 
 func (s *Store) Get(ctx context.Context, c, k string, v any) error {
 	j, err := s.c.HGet(ctx, c, k).Result()
-	// FIXME, should figure out error
+	// FIXME, should figure out error type and check it, instead just see if
+	// string is empty for now.
 	if j == "" {
 		return kv.NotFoundError
 	}
